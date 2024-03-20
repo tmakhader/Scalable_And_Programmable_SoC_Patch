@@ -16,7 +16,7 @@ module fru_pla #(
     input  [INPUT_SIZE-1:0]                           Trigger,              // Trigger signal 
     input  [OUTPUT_SIZE-1:0][$clog2(INPUT_SIZE)-1:0]  RegMux,               // cfg_reg for configuring signal selection
     input  [OUTPUT_SIZE-1:0][2**SEGMENT_SIZE-1:0]     RegMintermORSelect,   // cfg_reg for selecting Minterms perform OR operation
-    output [OUTPUT_SIZE-1:0]  FruSelect                                     // FRU select signal
+    output [OUTPUT_SIZE-1:0]                          FruSelect             // FRU select signal
 )
 
     genvar g_pla;
