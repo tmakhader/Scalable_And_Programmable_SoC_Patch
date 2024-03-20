@@ -12,6 +12,9 @@ module smu_unit # (
     input  logic [K-1:0]                RegCmp             // Register used for comparison
     input  logic                        RegCmpSelect,      // Register used to select type of comparison
     input  logic [$clog2(N)-1:0]        RegFsmCmp,         // Register used for FSM state comparison 
+    input  logic                        SmuEn              // Signal used to enable SMU -
+                                                           // SMU should only be enabled when cfg bitstream is 
+                                                           // fully loaded.
 
     // Trigger signal
     output logic [$clog2(N)-1:0]        SmuState,          // # of patterns matched
@@ -53,15 +56,20 @@ module smu_unit # (
     // Check for pattern  match
     assign StateMatch = ~|(SmuState ^ RegFsmCmp);
 
-    // Check for a multi-cycle pattern match
-    assign trigger = StateMatch & CmpSel;
+    // Check for a multi-cycle pattern match (Given SMU is enabled)
+    assign trigger = SmuEn ? (StateMatch & CmpSel) : 1'b0;
 
     // SMU FSM Datapath - Update FSM when a Cmp match is found and we are not yet at the target pattern match state
     assign SMUNextstate = (CmpSel & ~StateMatch)  ?  (SmuState + ($bits(SmuState))'d1) : '0;
 
     // SMU FSM FF
-    always_ff @(posedge clk) begin
+    always_ff @(posedge gated_clk) begin
         SmuState <= SmuStateNext;
+    end
+
+    // Clock Gating logic - Used to enable/disable SMU
+    always_comb begin
+        gated_clk = clk & SmuEn;
     end
 endmodule
 
