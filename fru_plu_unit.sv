@@ -15,7 +15,6 @@ module fru_pla_unit #(
 
     logic [SEGMENT_SIZE-1:0]     MuxedInp;
     logic [2**SEGMENT_SIZE-1:0]  Minterms;
-    genvar g_pla, g_pla_in;
 
     // There are 3 stages in segmented PLA generation - 
     // 1. Signal Selection - Select SEGMENT_SIZE # of signals from INPUT_SIZE based on 
