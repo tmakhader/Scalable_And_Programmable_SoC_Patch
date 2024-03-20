@@ -5,7 +5,7 @@ module smu_bitstream_deserializer #(
     input  logic StreamValid            // Valid bit indicating input stream is valid
     input  logic clk,                   // Clock input
     input  logic rst,                   // Reset input
-    output logic [N-1:0] ParallelOut,   // Output register to store N bits
+    output logic [CFG_SIZE-1:0] ParallelOut,   // Output register to store N bits
 
     output logic CfgDone                // Signal to indicate that bit-stream has been completely loaded.
                                         // For correct programming, CongigDoneOut should always match is 
@@ -21,7 +21,7 @@ module smu_bitstream_deserializer #(
             ParallelOutNext = 0; // Reset the register
         end else begin
             // If stream is valid: Shift the existing data to the left and store the new bit at the LSB
-            ParallelOutNext =  StreamValid ? { ParallelOut[N-2:0], SerialIn } : ParallelOut;
+            ParallelOutNext =  StreamValid ? { ParallelOut[CFG_SIZE-2:0], SerialIn } : ParallelOut;
         end
     end
 
@@ -42,6 +42,6 @@ module smu_bitstream_deserializer #(
     end
 
     // CfgDone indicates that bitstream loading is complete
-    assign CfgDone = (StreamBitCount == N);
+    assign CfgDone = (StreamBitCount == CFG_SIZE);
 
 endmodule

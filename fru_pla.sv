@@ -1,38 +1,39 @@
 // To reduce the hardware impact of the exponential # of select signals, we create a light-weight
-// segmented PLA logic that create multiple instances of smaller PLA. This requires a restricted 
-// configuration that requires trigger signal vs select signal ordering the design is as follows-
-
+// segmented PLA logic that create multiple instances of smaller PLAs. This restricts the max
+// # of trigger signals that can be used at a time to generate a FRU select signal. 
+//
 // Let us assume that a select signal requires SEGMENT_SIZE # of triggers to make a control 
-// decision. The segment PLA would be a SEGMENT_SIZE X 1 regular PLA
+// decision. The segment PLA would be multiple copies of a SEGMENT_SIZE X 1 regular PLA
+// To choose the inputs to segments we would have a INPUT_SIZE X SEGMENT_SIZE MUX that is 
+// driven by a cfg_reg- RegMux. Depending on the size of FruSelect we would have OUTPUT_SIZE 
+// copies of the logic. For optimal timing and resource overhead
 
 module fru_pla #(
     parameter INPUT_SIZE     = 2,
-    parameter OUTPUT_SIZE    = 4
+    parameter OUTPUT_SIZE    = 4,
+    parameter SEGMENT_SIZE   = 2
 ) (
-    input  [INPUT_SIZE-1:0]   Trigger,
-    output [OUTPUT_SIZE-1:0]  FruSelect
+    input  [INPUT_SIZE-1:0]                           Trigger,              // Trigger signal 
+    input  [OUTPUT_SIZE-1:0][$clog2(INPUT_SIZE)-1:0]  RegMux,               // cfg_reg for configuring signal selection
+    input  [OUTPUT_SIZE-1:0][2**SEGMENT_SIZE-1:0]     RegMintermORSelect,   // cfg_reg for selecting Minterms perform OR operation
+    output [OUTPUT_SIZE-1:0]  FruSelect                                     // FRU select signal
 )
-    logic [INPUT_SIZE-1:0]    TriggerN;
 
-    // There are 4 stages in PLA - 
-    // 1. Signal Buffering/Inverting - In this stage we have buffered/inverted copies of all signals
-    // 2. Minterm Generation - In this stage we generate several minterms using signals 
-    //                         Two decisions - a. Max # of signals/triggers one would need to combine
-    //                                         b. Set of signals from which we need to select
-    // 3. Minterm ORing - At this stage we need to OR multiple minterms to generate the select signal
-    // 4. Replication of 2, 3 for every select signal
-    // In normal scenarios - Generating all possible minters has a complexity - pow(2, N), where N is
-    // the set of all signals
-   
     genvar g_pla;
     generate
-
-        // Negated Signal generator
+        // Instantiate OUTPUT_SIZE # of SEGMENT_SIZE X 1 segmented PLU units
         always_comb begin
-            for (g_pla = 0; g_pla < INPUT_SIZE; g_pla++) begin
-                TriggerN[g_pla] = ~Trigger[g_pla];
+            for (g_pla = 0; g_pla < OUTPUT_SIZE; g_pla++) begin
+                fru_pla_unit #(
+                    .INPUT_SIZE           (INPUT_SIZE),
+                    .SEGMENT_SIZE         (SEGMENT_SIZE)
+                ) fru_pla_unit_inst (
+                    .Inp                  (Trigger),
+                    .RegMux               (RegMux[g_pla]),
+                    .RegMintermORSelect   (RegMintermORSelect[g_pla]),
+                    .out                  (FruSelect[g_pla])
+                );
             end
         end
-
-
     endgenerate
+endmodule
