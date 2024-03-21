@@ -13,7 +13,7 @@ module fru_pla #(
     parameter OUTPUT_SIZE    = 4,
     parameter SEGMENT_SIZE   = 2
 ) (
-    input  [INPUT_SIZE-1:0]                           Trigger,              // Trigger signal 
+    input  [INPUT_SIZE-1:0]                           Qin,              // Trigger signal 
     input  [OUTPUT_SIZE-1:0][$clog2(INPUT_SIZE)-1:0]  RegMux,               // cfg_reg for configuring signal selection
     input  [OUTPUT_SIZE-1:0][2**SEGMENT_SIZE-1:0]     RegMintermORSelect,   // cfg_reg for selecting Minterms perform OR operation
     output [OUTPUT_SIZE-1:0]                          FruSelect             // FRU select signal
@@ -28,7 +28,7 @@ module fru_pla #(
                     .INPUT_SIZE           (INPUT_SIZE),
                     .SEGMENT_SIZE         (SEGMENT_SIZE)
                 ) fru_pla_unit_inst (
-                    .Inp                  (Trigger),
+                    .Inp                  (Qin),
                     .RegMux               (RegMux[g_pla]),
                     .RegMintermORSelect   (RegMintermORSelect[g_pla]),
                     .out                  (FruSelect[g_pla])
