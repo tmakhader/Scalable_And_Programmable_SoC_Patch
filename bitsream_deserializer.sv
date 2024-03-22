@@ -1,4 +1,4 @@
-module smu_bitstream_deserializer #(
+module bitstream_deserializer #(
     parameter CFG_SIZE = 100            // Number of bits to store
 )(
     input  logic SerialIn,              // Single-bit input to stream data

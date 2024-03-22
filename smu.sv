@@ -11,9 +11,14 @@ module smu # (
     input  logic             BitStreamSerialIn,       // Bit-Stream input
     input  logic             BitStreamValid,
     input  logic             cfg_clk,
+    input  logic             GlobalSmuEn,             // Lets you enable/disable SMU.
+                                                      // Note that this doesn't affect bitsream programming/decryption
+                                                      // SMU should be enabled after getting BitstreamLoaded handshake
 
     // M-bit trigger output
-    output logic [M-1:0]     trigger
+    output logic [M-1:0]     trigger,
+    output logic             BitstreamLoaded          // Handshake signal to indicate that bitstream has been 
+                                                      // successfully programmed and decrypted.
 );
 
     // Generated local params
@@ -35,7 +40,8 @@ module smu # (
     logic [M-1:0][CFG_SMU_UNIT_SIZE-1:0]            CfgRegSmuPerState;
     logic [M-1:0][$clog2(N)-1:0]                    SmuState;
     logic                                           SmuEn;
-    logic                                           CfgDoneUnsynced
+    logic                                           DecryptionDone;
+    logic                                           SmuCfgDone, SmuCfgDoneUnsynced;
 
     // Primary configuration register array that is sequentially programmed during boot
     logic [N-1:0][M-1:0][CFG_SMU_UNIT_SIZE-1:0]     CfgRegSmu, CfgRegSmuEncrypted;
@@ -55,7 +61,7 @@ module smu # (
                 .clk            ( rst ),
                 .rst            ( clk ),
                 .i              ( p ) , 
-                .SmuEn          ( SmuCfgDone ),  // SMU is enabled once the CfgReg is programmed    
+                .SmuEn          ( SmuEn ),  // SMU is enabled once the CfgReg is programmed    
 
                 // Configuration Registers -- Function of SmuState and genvar i
                 .RegCmpMask     ( CfgRegSmuPerState[g_smu][REG_CMP_MASK_BEGIN:REG_CMP_MASK_END] ),
@@ -76,7 +82,7 @@ module smu # (
 
 
     // Module to interface a sequential cfg bitstream
-    smu_bitstream_deserializer # (
+    bitstream_deserializer # (
         .CFG_SIZE            ( $bits(CfgRegSmu) )
     ) deserializer_inst (
         .clk                 ( cfg_clk ),
@@ -99,15 +105,23 @@ module smu # (
     //             Clock Domain Crossing (CDC) consistency 
 
     always_ff @(posedge clk) begin
-        CfgDone <= CfgDoneUnsynced;
+        SmuCfgDone <= SmuCfgDoneUnsynced;
     end
 
+    assign SmuEn =  GlobalSmuEn  & 
+                    SmuCfgDone    &
+                    DecryptionDone;
+    
+    assign BitstreamLoaded = SmuCfgDone &
+                             DecryptionDone;
+
     // Module to decrypt the cfg bitstream
-    smu_cfg_decrypt #(
+    cfg_decrypt #(
         .CFG_SIZE       ( $bits(CfgRegSmu) ),
         .DECRYPT_KEY    ( DECRYPT_KEY )
-    ) smu_cfg_decrypt_inst (
+    ) smu_cfg_decrypt_smu_inst (
         .EncryptedCfg   ( CfgRegSmuEncrypted ),
-        .DecryptedCfg   ( CfgRegSmu )
+        .DecryptedCfg   ( CfgRegSmu ),
+        .DecryptionDone ( DecryptionDone ) 
     )
 endmodule

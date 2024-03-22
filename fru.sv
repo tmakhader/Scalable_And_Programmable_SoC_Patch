@@ -4,21 +4,26 @@ module fru #(
     parameter  C                  =    5,                // Maximum # of Clk signals under control
     parameter  S                  =    20,               // Maximum # of Non-FSM signal bits under control
     parameter  SEGMENT_SIZE       =    3,
+    parameter  DECRYPT_KEY        =    32'hDEAD_BEEF,    // Decryption key for bit-stream
 
     localparam CONTROL_WIDTH      =    (2*F) + C + S     // Width of controllable signal set
 ) (
     // clk and reset signals
     input                        clk,
+    input  logic                 cfg_clk,                    // cfg_clk
     input                        rst,
-
-    // Controllable signal set
-    input   [CONTROL_WIDTH-1:0]  Qin,                        // Controllable signal set input (In the order) -
-                                                             // {FSM_STATE_INPUTS, FSM_STATE_OUTPUTS, CLKS, NON_FSM_SIGNALS}
-    output  [CONTROL_WIDTH-1:0]  QOut,                       // Controllable signal set output (In the order) -
-                                                             // {FSM_STATE_INPUTS, FSM_STATE_OUTPUTS, CLKS, NON_FSM_SIGNALS}
     input  logic                 BitStreamSerialIn,          // Bit-Stream input
     input  logic                 BitStreamValid,             // Bit-stream valid
-    input  logic                 cfg_clk                     // cfg_clk
+    input  logic                 GlobalFruEn                 // Lets you enable/disable FRU
+    // Controllable signal set
+    input  logic [CONTROL_WIDTH-1:0]  Qin,                   // Controllable signal set input (In the order) -
+                                                             // {FSM_STATE_INPUTS, FSM_STATE_OUTPUTS, CLKS, NON_FSM_SIGNALS}
+
+    output logic [CONTROL_WIDTH-1:0]  QOut,                  // Controllable signal set output (In the order) -
+                                                             // {FSM_STATE_INPUTS, FSM_STATE_OUTPUTS, CLKS, NON_FSM_SIGNALS}
+
+    output logic                      BitstreamLoaded        // Handshake signal to indicate that bitstream has been 
+                                                             // successfully programmed and decrypted.
 );
     // CfgRegFru constitite the constants for signal filters and PLA cfg_registers
     // The signal ordering is:    {RegMux                    --> Signal selector for Segment PLAs 
@@ -60,6 +65,7 @@ module fru #(
 
     logic [CFG_WIDTH-1:0]       CfgRegFru, CfgRegFruEncrypted;
     logic [CONTROL_WIDTH-1:0]   FruSelect;
+    logic                       FruEn;
 
     // Segmented PLA instantiation
     fru_pla #(
@@ -80,6 +86,7 @@ module fru #(
         .Qin                        ( Qin[PART_FSM_IN_BEGIN:PART_SIGNAL_END] ),
         .BypassEn                   ( FruSelect[PART_FSM_IN_BEGIN:PART_SIGNAL_END] ),
         .RegConst                   ( CfgRegFru[REG_FSM_IN_BEGIN:REG_SIGNAL_END] ),
+        .FruEn                      ( FruEn ),
         .Qout                       ( Qout[PART_FSM_IN_BEGIN:PART_SIGNAL_END] )
     );
 
@@ -91,12 +98,48 @@ module fru #(
             fru_security_clock_gate fru_security_clock_gate_inst (
                 .clk                ( clk ),
                 .gate_en            ( CfgRegFru[g_fru + REG_CLK_END] ),
-                .gated_clk          ( Qout[g_fru + PART_CLK_END])
-            )
+                .FruEn              ( FruEn )
+                .gated_clk          ( Qout[g_fru + PART_CLK_END] )
+            );
         end
     endgenerate
 
     // Bitstream deserializer
+    bitstream_deserializer #(
+        .CFG_SIZE           (CFG_WIDTH)
+    ) fru_bitstream_deserializer_inst (
+        .SerialIn           ( SerialIn ),
+        .StreamValid        ( StreamValid ),
+        .clk                ( clk_cfg ),
+        .rst                ( rst ),
+        .ParallelOut        ( CfgRegFruEncrypted ),
+        .CfgDone            ( FruCfgDoneUnsynced )
+    );
+
+    assign FruEn  = GlobalFruEn   & 
+                    FruCfgDone    &
+                    DecryptionDone;
+
+    assign BitstreamLoaded = FruCfgDone &
+                             DecryptionDone;
+
+    // Dual Flop - Sync logic to sync b/w d deserializer and 
+    //             the SMU logic. Since, we know that the
+    //             deserialized cfg is used only after CfgDone,
+    //             syncing CfgDone should ensure appropriate
+    //             Clock Domain Crossing (CDC) consistency 
+
+    always_ff @(posedge clk) begin
+        FruCfgDone <= FruCfgDoneUnsynced;
+    end
 
     // Bitstream decryption
+    cfg_decrypt #(
+        .CFG_SIZE          ( CFG_WIDTH ),
+        .DECRYPT_KEY       ( DECRYPT_KEY )
+    ) fru_cfg_decrypt_inst (
+        .EncryptedCfg      ( CfgRegFruEncrypted ),
+        .DecryptedCfg      ( CfgRegFru ),
+        .DecryptionDone    ( DecryptionDone )
+    )
 endmodule
