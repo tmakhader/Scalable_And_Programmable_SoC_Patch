@@ -2,7 +2,10 @@ module smu # (
     parameter  N                  =    2,             // Maximum # of cycles for observability
     parameter  K                  =    4,             // Maximum # of observable signal bits
     parameter  M                  =    6              // Maximum # of triggers (parallel SMU units)    
-    parameter  DECRYPT_KEY        =    32'hDEAD_BEEF  // Decryption key for bit-stream
+    parameter  DECRYPT_KEY        =    32'hDEAD_BEEF, // Decryption key for bit-stream
+    parameter  SMU_SEGMENT_SIZE   =    64             // Describes the size of smu_unit. For instance
+                                                      // hardware complexity-wise this deploys a 64
+                                                      // bit comperator
 ) (
     // Clk and Rst
     input  logic             clk,                     // clk
@@ -22,15 +25,20 @@ module smu # (
 );
 
     // Generated local params
-    localparam CFG_SMU_UNIT_SIZE  = ( 2*K ) +                                 // RegCmp + RegCmpMask
-                                    ( 1 )   +                                 // RegCmpSel
-                                    ( $clog2(N) );                            // RegFsmCmp
-    localparam REG_CMP_BEGIN      = REG_CMP_END        + K - 1
-    localparam REG_CMP_END        = REG_CMP_MASK_BEGIN + 1
-    localparam REG_CMP_MASK_BEGIN = REG_CMP_MASK_END   + K - 1               
-    localparam REG_CMP_MASK_END   = REG_CMP_SEL_BEGIN  + 1
+    localparam SMU_NUM_SEGMENTS   = (K + SMU_SEGMENT_SIZE - 1)/SMU_SEGMENT_SIZE;  // # of segments
+    localparam BITS_NUM_SEGMENTS  = $clog2(SMU_NUM_SEGMENTS);
+    localparam CFG_SMU_UNIT_SIZE  = ( BITS_NUM_SEGMENTS )                         // RegInpSel
+                                    ( 2*SMU_SEGMENT_SIZE ) +                      // RegCmp + RegCmpMask
+                                    ( 1 )   +                                     // RegCmpSel
+                                    ( $clog2(N) );                                // RegFsmCmp
+    localparam REG_SEL_START      = REG_SEL_END        + BITS_NUM_SEGMENTS - 1;
+    localparam REG_SEL_END        = REG_CMP_BEGIN      + 1;
+    localparam REG_CMP_BEGIN      = REG_CMP_END        + SMU_NUM_SEGMENTS - 1;
+    localparam REG_CMP_END        = REG_CMP_MASK_BEGIN + 1;
+    localparam REG_CMP_MASK_BEGIN = REG_CMP_MASK_END   + SMU_NUM_SEGMENTS - 1;               
+    localparam REG_CMP_MASK_END   = REG_CMP_SEL_BEGIN  + 1;
     localparam REG_FSM_CMP_BEGIN  = REG_FSM_CMP_END    + $clog2(N) - 1;
-    localparam REG_FSM_CMP_END    = REG_CMP_SEL_BEGIN  + 1
+    localparam REG_FSM_CMP_END    = REG_CMP_SEL_BEGIN  + 1;
     localparam REG_CMP_SEL_BEGIN  = REG_CMP_SEL_END                          
     localparam REG_CMP_SEL_END    = 0
 
@@ -53,8 +61,9 @@ module smu # (
     generate
         for (g_smu = 0; g_smu < M; g_smu++) begin
             smu_unit # (
-                .N              ( N ),
-                .K              ( K ),
+                .N                   ( N ),
+                .K                   ( K ),
+                .SMU_SEGMENT_SIZE    ( SMU_SEGMENT_SIZE )
             
             )smu_unit_inst(
                 // Clk, Rst, observable input set, SMU enable signal
@@ -64,6 +73,7 @@ module smu # (
                 .SmuEn          ( SmuEn ),  // SMU is enabled once the CfgReg is programmed    
 
                 // Configuration Registers -- Function of SmuState and genvar i
+                .RegInpSel      ( CfgRegSmuPerState[g_smu][REG_SEL_START:REG_SEL_END] )
                 .RegCmpMask     ( CfgRegSmuPerState[g_smu][REG_CMP_MASK_BEGIN:REG_CMP_MASK_END] ),
                 .RegCmp         ( CfgRegSmuPerState[g_smu][REG_CMP_BEGIN:REG_CMP_END] ),
                 .RegCmpSelect   ( CfgRegSmuPerState[g_smu][REG_CMP_SEL_BEGIN:REG_CMP_SEL_END]),

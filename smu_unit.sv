@@ -1,24 +1,29 @@
 module smu_unit # (
-    parameter N =    2,   // Maximum # of cycles for observability
-    parameter K =    4    // Maximum # of observable signal bits
+    parameter  N                  =    2,   // Maximum # of cycles for observability
+    parameter  K                  =    4    // Maximum # of observable signal bits
+    parameter  SMU_SEGMENT_SIZE   =    64,
+    localparam SMU_NUM_SEGMENTS   =    ((K + SMU_SEGMENT_SIZE - 1)/SMU_SEGMENT_SIZE),
+    localparam BITS_NUM_SEGMENTS  =    $clog2(NUM_SEGMENTS)
 ) (
     // Clock, Reset signals
     input  logic                               clk,
     input  logic                               rst,
 
     // Observable input set and registers
-    input  logic [K-1:0]                i,                 // Observable signal input
-    input  logic [K-1:0]                RegCmpMask,        // Comparator Mask Register
-    input  logic [K-1:0]                RegCmp             // Register used for comparison
-    input  logic                        RegCmpSelect,      // Register used to select type of comparison
-    input  logic [$clog2(N)-1:0]        RegFsmCmp,         // Register used for FSM state comparison 
-    input  logic                        SmuEn              // Signal used to enable SMU -
+    input  logic [K-1:0]                  i,                 // Observable signal input
+    input  logic [BITS_NUM_SEGMENTS-1:0]  RegInpSel,         // Register to select relevant segment
+    input  logic [K-1:0]                  RegCmpMask,        // Comparator Mask Register
+    input  logic [K-1:0]                  RegCmp             // Register used for comparison
+    input  logic                          RegCmpSelect,      // Register used to select type of comparison
+    input  logic [$clog2(N)-1:0]          RegFsmCmp,         // Register used for FSM state comparison 
+    input  logic 
+    input  logic                          SmuEn              // Signal used to enable SMU -
                                                            // SMU should only be enabled when cfg bitstream is 
                                                            // fully loaded.
 
     // Trigger signal
-    output logic [$clog2(N)-1:0]        SmuState,          // # of patterns matched
-    output logic                        trigger            // Output trigger signal
+    output logic [$clog2(N)-1:0]          SmuState,          // # of patterns matched
+    output logic                          trigger            // Output trigger signal
 );
 
     logic [K-1:0]            MaskedCmpInp;
@@ -29,15 +34,22 @@ module smu_unit # (
     logic [$clog2(N)-1:0]    SmuStateNext; 
     logic                    StateMatch;
 
-    
+    logic [SMU_SEGMENT_SIZE-1:0]                       p;
+    logic [SMU_NUM_SEGMENTS-1:0][SMU_SEGMENT_SIZE-1:0] SegmentedI;
+
+    // Logic to select relevant segment of observable input set.
+    always_comb begin
+        SegmentedI = {$bits(SegmentedI)i};
+        p          = SegmentedI[RegInpSel];
+    end
 
     // Logic to mask the input for comparison
-    assign MaskedCmpInp      = (i & RegCmpMask);
+    assign MaskedCmpInp      = (p & RegCmpMask);
 
     // Comparator logic
-    assign CmpEq = ~|(MaskedCmpInp ^ RegCmp);   // Compare if i == Reg
-    assign CmpGt = &(~MaskedCmpInp & RegCmp);   // Compare if i > Reg
-    assign CmpLt = ~(CmpGt | CmpEq);            // Compare if i < Reg
+    assign CmpEq = MaskedCmpInp == RegCmp;   // Compare if i == Reg
+    assign CmpGt = MaskedCmpInp >  RegCmp;   // Compare if i > Reg
+    assign CmpLt = MaskedCmpInp <  RegCmp;   // Compare if i < Reg
 
     // Cmp Select
     always_comb begin : SelectCompareType

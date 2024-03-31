@@ -1,3 +1,5 @@
+// AR: FRU_UNIT segmentation
+
 module fru #(
     parameter  M                  =    6,                // Maximum # of triggers (parallel SMU units) 
     parameter  F                  =    12                // Maximum # of FSM state machine bits under control
