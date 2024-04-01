@@ -145,16 +145,17 @@ class VerilogParser(LogStructuring):
             if isinstance(astNode, Input) or  \
                isinstance(astNode, Output) or \
                isinstance(astNode, Inout) or  \
-               isinstance(astNode, Decl):
+               isinstance(astNode, Reg) or  \
+               isinstance(astNode, Wire): 
                 # Check if the line has a pragma
                 if astNode.lineno in lineToPragma:
                     # Check if there is an observe and control pragma
                     if lineToPragma[int(astNode.lineno)][0] and lineToPragma[int(astNode.lineno)][1]:
                         signalToObserve.update({astNode.name:(lineToPragma[int(astNode.lineno)][0][0],   \
                                                               lineToPragma[int(astNode.lineno)][0][1])})  
-                        signalToControl.update({astNode.name:(lineToPragma[int(astNode.lineno)][0][0],   \
-                                                              lineToPragma[int(astNode.lineno)][0][0],   \
-                                                              lineToPragma[int(astNode.lineno)][0][1])}) 
+                        signalToControl.update({astNode.name:(lineToPragma[int(astNode.lineno)][1][0],   \
+                                                              lineToPragma[int(astNode.lineno)][1][1],   \
+                                                              lineToPragma[int(astNode.lineno)][1][2])}) 
                     # Check if there is only an observe pragma
                     elif lineToPragma[int(astNode.lineno)][0]:
                         signalToObserve.update({astNode.name:(lineToPragma[int(astNode.lineno)][0][0],   \
@@ -162,9 +163,9 @@ class VerilogParser(LogStructuring):
                     
                     # Given pragma is exception protected, this one should be control pragma
                     else:
-                        signalToControl.update({astNode.name:(lineToPragma[int(astNode.lineno)][0][0],   \
-                                                              lineToPragma[int(astNode.lineno)][0][0],   \
-                                                              lineToPragma[int(astNode.lineno)][0][1])}) 
+                        signalToControl.update({astNode.name:(lineToPragma[int(astNode.lineno)][1][0],   \
+                                                              lineToPragma[int(astNode.lineno)][1][1],   \
+                                                              lineToPragma[int(astNode.lineno)][1][2])}) 
             for childNode in childNodes:
                 signalToObserveChild, signalToControlChild = self.traverseAst(childNode, lineToPragma, signalToControl, signalToObserve)
                 signalToObserve.update(signalToObserveChild)
@@ -214,3 +215,4 @@ if __name__ == '__main__':
     parser = VerilogParser(filelist)
     fileToSignalToObserve, fileToSignalToControl = parser.fileToSignalToPragma()
     print (fileToSignalToObserve)
+    print (fileToSignalToControl)

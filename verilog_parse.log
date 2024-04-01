@@ -457,3 +457,130 @@ Sample.v
 2 --> ((0, 0), None)
 
 2024-04-01 02:10:11,643 - INFO - Observable/Controllable signals found in file - Sample.v
+2024-04-01 02:15:48,779 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-01 02:15:48,779 - INFO - Pragma extractor initialized with filelist.f
+2024-04-01 02:15:48,779 - INFO - Parser initialized with filelist.f
+2024-04-01 02:15:49,296 - INFO - Filewise AST generated
+2024-04-01 02:15:49,296 - INFO - Files in filelist filelist.f - 
+Sample.v
+
+2024-04-01 02:15:49,297 - INFO - Pragma distribution in file - Sample.v is 
+2 --> ((0, 0), ('fsm', 0, 0))
+
+2024-04-01 02:15:49,297 - INFO - Observable/Controllable signals found in file - Sample.v
+2024-04-01 02:16:11,548 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-01 02:16:11,548 - INFO - Pragma extractor initialized with filelist.f
+2024-04-01 02:16:11,548 - INFO - Parser initialized with filelist.f
+2024-04-01 02:16:12,062 - INFO - Filewise AST generated
+2024-04-01 02:16:12,062 - INFO - Files in filelist filelist.f - 
+Sample.v
+
+2024-04-01 02:16:12,062 - INFO - Pragma distribution in file - Sample.v is 
+2 --> ((0, 0), ('fsm', 0, 0))
+
+2024-04-01 02:16:12,063 - INFO - Observable/Controllable signals found in file - Sample.v
+2024-04-01 02:18:06,759 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-01 02:18:06,759 - INFO - Pragma extractor initialized with filelist.f
+2024-04-01 02:18:06,759 - INFO - Parser initialized with filelist.f
+2024-04-01 02:18:07,279 - INFO - Filewise AST generated
+2024-04-01 02:18:07,279 - INFO - Files in filelist filelist.f - 
+Sample.v
+
+2024-04-01 02:18:07,279 - INFO - Pragma distribution in file - Sample.v is 
+2 --> ((0, 0), ('fsm', 0, 0))
+
+2024-04-01 02:18:07,279 - INFO - Observable/Controllable signals found in file - Sample.v
+2024-04-01 02:49:39,897 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-01 02:49:39,898 - INFO - Pragma extractor initialized with filelist.f
+2024-04-01 02:49:39,898 - INFO - Parser initialized with filelist.f
+2024-04-01 02:49:40,419 - INFO - Filewise AST generated
+2024-04-01 02:49:40,419 - INFO - Files in filelist filelist.f - 
+Sample.v
+
+2024-04-01 02:49:40,419 - INFO - Pragma distribution in file - Sample.v is 
+2 --> ((0, 0), ('fsm', 0, 0))
+3 --> ((0, 0), None)
+4 --> (None, ('fsm', 0, 0))
+
+2024-04-01 02:49:40,420 - INFO - Observable/Controllable signals found in file - Sample.v
+2024-04-01 02:50:20,829 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-01 02:50:20,829 - INFO - Pragma extractor initialized with filelist.f
+2024-04-01 02:50:20,829 - INFO - Parser initialized with filelist.f
+2024-04-01 02:50:21,349 - INFO - Filewise AST generated
+2024-04-01 02:50:21,349 - INFO - Files in filelist filelist.f - 
+Sample.v
+
+2024-04-01 02:50:21,349 - INFO - Pragma distribution in file - Sample.v is 
+2 --> ((0, 0), ('fsm', 0, 0))
+3 --> ((0, 0), None)
+4 --> (None, ('fsm', 0, 0))
+
+2024-04-01 02:50:21,349 - INFO - Observable/Controllable signals found in file - Sample.v
+2024-04-01 02:51:29,957 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-01 02:51:29,957 - INFO - Pragma extractor initialized with filelist.f
+2024-04-01 02:51:29,957 - INFO - Parser initialized with filelist.f
+2024-04-01 02:51:30,475 - INFO - Filewise AST generated
+2024-04-01 02:51:30,475 - INFO - Files in filelist filelist.f - 
+Sample.v
+
+2024-04-01 02:51:30,475 - INFO - Pragma distribution in file - Sample.v is 
+2 --> ((0, 0), ('fsm', 0, 0))
+3 --> ((0, 1), None)
+4 --> (None, ('fsm', 0, 0))
+
+2024-04-01 02:51:30,475 - INFO - Observable/Controllable signals found in file - Sample.v
+2024-04-01 02:53:13,967 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-01 02:53:13,968 - INFO - Pragma extractor initialized with filelist.f
+2024-04-01 02:53:13,968 - INFO - Parser initialized with filelist.f
+2024-04-01 02:53:14,486 - INFO - Filewise AST generated
+2024-04-01 02:53:14,486 - INFO - Files in filelist filelist.f - 
+Sample.v
+
+2024-04-01 02:53:14,486 - INFO - Pragma distribution in file - Sample.v is 
+2 --> ((0, 0), ('fsm', 0, 0))
+3 --> ((0, 0), None)
+4 --> (None, ('fsm', 0, 0))
+7 --> ((0, 0), None)
+
+2024-04-01 02:54:25,744 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-01 02:54:25,744 - INFO - Pragma extractor initialized with filelist.f
+2024-04-01 02:54:25,744 - INFO - Parser initialized with filelist.f
+2024-04-01 02:54:26,260 - INFO - Filewise AST generated
+2024-04-01 02:54:26,261 - INFO - Files in filelist filelist.f - 
+Sample.v
+
+2024-04-01 02:54:26,261 - INFO - Pragma distribution in file - Sample.v is 
+2 --> ((0, 0), ('fsm', 0, 0))
+3 --> ((0, 0), None)
+4 --> (None, ('fsm', 0, 0))
+7 --> ((0, 0), None)
+
+2024-04-01 02:54:26,261 - INFO - Observable/Controllable signals found in file - Sample.v
+2024-04-01 02:55:03,055 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-01 02:55:03,055 - INFO - Pragma extractor initialized with filelist.f
+2024-04-01 02:55:03,055 - INFO - Parser initialized with filelist.f
+2024-04-01 02:55:03,579 - INFO - Filewise AST generated
+2024-04-01 02:55:03,579 - INFO - Files in filelist filelist.f - 
+Sample.v
+
+2024-04-01 02:55:03,579 - INFO - Pragma distribution in file - Sample.v is 
+2 --> ((0, 0), ('fsm', 0, 0))
+3 --> ((0, 0), None)
+4 --> (None, ('fsm', 0, 0))
+7 --> ((0, 0), None)
+
+2024-04-01 02:55:03,579 - INFO - Observable/Controllable signals found in file - Sample.v
+2024-04-01 02:55:32,431 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-01 02:55:32,432 - INFO - Pragma extractor initialized with filelist.f
+2024-04-01 02:55:32,432 - INFO - Parser initialized with filelist.f
+2024-04-01 02:55:33,079 - INFO - Filewise AST generated
+2024-04-01 02:55:33,079 - INFO - Files in filelist filelist.f - 
+Sample.v
+
+2024-04-01 02:55:33,079 - INFO - Pragma distribution in file - Sample.v is 
+2 --> ((0, 0), ('fsm', 0, 0))
+3 --> ((0, 0), None)
+4 --> (None, ('fsm', 0, 0))
+7 --> (None, ('signal', 0, 0))
+
+2024-04-01 02:55:33,080 - INFO - Observable/Controllable signals found in file - Sample.v
