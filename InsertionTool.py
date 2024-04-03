@@ -17,7 +17,7 @@ fileHandler = logging.FileHandler('verilog_parse.log', mode='w')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fileHandler.setFormatter(formatter)
 logging.getLogger().addHandler(fileHandler)
-logging.info("Started ASAP tool for Hardware Patching...\n\n " + pyfiglet.figlet_format("ASAP  PATCH"))
+logging.info("Started Automatic, Secure And Programmable (ASAP) tool for Hardware Patching...\n\n " + pyfiglet.figlet_format("ASAP  PATCH"))
 #--------------------------------------------------------------------------------------------------#
 
 # Exception class for pragma parsing
@@ -109,7 +109,7 @@ class PragmaExtractor(LogStructuring):
         # Ensure that the filelist exists
         assert os.path.exists(self.filelist), "Filelist %s doesn't exist"%(self.filelist)
         files = [filename.strip() for filename in open(self.filelist, 'r')]
-        logging.info("Files in filelist %s - %s"%(self.filelist, self.logListInfo(files)))
+        logging.info("List of files in filelist %s - %s"%(self.filelist, self.logListInfo(files)))
         return {file: self.fileParser(file) for file in files}
 
 

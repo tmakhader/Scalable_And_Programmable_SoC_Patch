@@ -1,4 +1,4 @@
-2024-04-03 06:40:24,403 - INFO - Started ASAP tool for Hardware Patching...
+2024-04-03 06:45:02,474 - INFO - Started Automatic, Secure And Programmable (ASAP) tool for Hardware Patching...
 
      _    ____    _    ____     ____   _  _____ ____ _   _ 
    / \  / ___|  / \  |  _ \   |  _ \ / \|_   _/ ___| | | |
@@ -7,27 +7,27 @@
 /_/   \_\____/_/   \_\_|      |_| /_/   \_\_| \____|_| |_|
                                                           
 
-2024-04-03 06:40:24,403 - INFO - Verilog signal parsing started for filelist filelist.f
-2024-04-03 06:40:24,403 - INFO - Pragma extractor initialized with filelist.f
-2024-04-03 06:40:24,403 - INFO - Parser initialized with filelist.f
-2024-04-03 06:40:24,924 - INFO - Filewise AST generated
-2024-04-03 06:40:24,924 - INFO - Files in filelist filelist.f - 
+2024-04-03 06:45:02,475 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-03 06:45:02,475 - INFO - Pragma extractor initialized with filelist.f
+2024-04-03 06:45:02,475 - INFO - Parser initialized with filelist.f
+2024-04-03 06:45:02,994 - INFO - Filewise AST generated
+2024-04-03 06:45:02,995 - INFO - List of files in filelist filelist.f - 
 Sample.v
 
-2024-04-03 06:40:24,924 - INFO - Pragma distribution in file - Sample.v is 
+2024-04-03 06:45:02,995 - INFO - Pragma distribution in file - Sample.v is 
 2 --> ((0, 0), ('signal', 0, 0))
 3 --> ((0, 0), None)
 5 --> (None, ('signal', 0, 0))
 7 --> (None, ('signal', 0, 0))
 9 --> (None, ('signal', 0, 0))
 
-2024-04-03 06:40:24,924 - INFO - Scanning AST of file - Sample.v for observable/controllable signals
-2024-04-03 06:40:24,925 - INFO - AST traversal complete: Observable/Controllable signals found in file - Sample.v
-2024-04-03 06:40:25,471 - INFO - Filewise AST generated
-2024-04-03 06:40:25,471 - INFO - Starting Patch Logic Insertion.....
-2024-04-03 06:40:25,471 - INFO - Inserting patch wiring in file - Sample.v
-2024-04-03 06:40:25,471 - INFO - Bits [0:0] of Input port A found as signal controlled
-2024-04-03 06:40:25,471 - INFO - Bits [0:0] of Output (wire) port out found as signal controlled
-2024-04-03 06:40:25,471 - INFO - Bits [0:0] of Output (reg) port out3 found as signal controlled
-2024-04-03 06:40:25,471 - INFO - Bits [0:0] of Wire test_wire found as signal controlled
-2024-04-03 06:40:25,487 - INFO - Patch logic insertion complete.
+2024-04-03 06:45:02,995 - INFO - Scanning AST of file - Sample.v for observable/controllable signals
+2024-04-03 06:45:02,995 - INFO - AST traversal complete: Observable/Controllable signals found in file - Sample.v
+2024-04-03 06:45:03,540 - INFO - Filewise AST generated
+2024-04-03 06:45:03,540 - INFO - Starting Patch Logic Insertion.....
+2024-04-03 06:45:03,540 - INFO - Inserting patch wiring in file - Sample.v
+2024-04-03 06:45:03,540 - INFO - Bits [0:0] of Input port A found as signal controlled
+2024-04-03 06:45:03,541 - INFO - Bits [0:0] of Output (wire) port out found as signal controlled
+2024-04-03 06:45:03,541 - INFO - Bits [0:0] of Output (reg) port out3 found as signal controlled
+2024-04-03 06:45:03,541 - INFO - Bits [0:0] of Wire test_wire found as signal controlled
+2024-04-03 06:45:03,556 - INFO - Patch logic insertion complete.
