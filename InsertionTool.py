@@ -330,6 +330,10 @@ class VerilogGenerator(LogStructuring):
             if isinstance(port.second, Wire) and isinstance(port.first, Input):
                 newPorts.append(port)
                 if port.first.name in signalToControl:
+                    logging.info("Bits [%s:%s] of Input port %s found as %s controlled"%(signalToControl[port.first.name][1],  \
+                                                                                     signalToControl[port.first.name][2],  \
+                                                                                     port.first.name,                      \
+                                                                                     signalToControl[port.first.name][0]))
                     newWire  = Decl((Wire(name = port.second.name + "_controlled", \
                                           width = port.second.width,               \
                                           signed = port.second.signed,             \
@@ -357,6 +361,10 @@ class VerilogGenerator(LogStructuring):
             elif isinstance(port.second, Wire) and isinstance(port.first, Output):
                 newPorts.append(port)
                 if port.first.name in signalToControl:
+                    logging.info("Bits [%s:%s] of Output (wire) port %s found as %s controlled"%(signalToControl[port.first.name][1], \
+                                                                                                 signalToControl[port.first.name][2], \
+                                                                                                 port.first.name,                     \
+                                                                                                 signalToControl[port.first.name][0]))
                     newWire  = Decl((Wire(name = port.second.name + "_controlled", \
                                           width = port.second.width,               \
                                           signed = port.second.signed,             \
@@ -383,6 +391,10 @@ class VerilogGenerator(LogStructuring):
             # -- Change all drivers of A to A_controlled 
             elif isinstance(port.second, Reg) and isinstance(port.first, Output):
                 if port.first.name in signalToControl:
+                    logging.info("Bits [%s:%s] of Output (reg) port %s found as %s controlled"%(signalToControl[port.first.name][1], \
+                                                                                                signalToControl[port.first.name][2], \
+                                                                                                port.first.name,                     \
+                                                                                                signalToControl[port.first.name][0]))
                     newReg   = Decl((Reg(name = port.second.name + "_controlled",  \
                                          width = port.second.width,                \
                                          signed = port.second.signed,
@@ -432,6 +444,10 @@ class VerilogGenerator(LogStructuring):
                 if isinstance(item.list[0], Reg):   # NOTE: item.list is a tuple
                     regDecl = item.list[0]
                     if regDecl.name in signalToControl:
+                        logging.info("Bits [%s:%s] of Register %s found as %s controlled"%(signalToControl[regDecl.name][1], \
+                                                                                           signalToControl[regDecl.name][2], \
+                                                                                           regDecl.name,                     \
+                                                                                           signalToControl[regDecl.name][0]))
                         # Making a Declaration node passed with list (tuple) of the new register - A_controlled
                         newReg =  Decl((Reg(name = regDecl.name + "_controlled",   \
                                             width = regDecl.width,                 \
@@ -467,6 +483,10 @@ class VerilogGenerator(LogStructuring):
                 elif isinstance(item.list[0], Wire):
                     wireDecl = item.list[0]
                     if wireDecl.name in signalToControl:
+                        logging.info("Bits [%s:%s] of Wire %s found as %s controlled"%(signalToControl[wireDecl.name][1], \
+                                                                                       signalToControl[wireDecl.name][2], \
+                                                                                       wireDecl.name,                     \
+                                                                                       signalToControl[wireDecl.name][0]))
                         # Making a Declaration node passed with list (tuple) of the new wire - A_controlled
                         newWire = Decl((Wire(name = wireDecl.name + "_controlled",  \
                                             width = wireDecl.width,                 \
@@ -542,6 +562,7 @@ class VerilogGenerator(LogStructuring):
     def genModifiedVerilogFile(self, file, signalToObserve, signalToControl):
         codegen = ASTCodeGenerator()
         newFilename = os.path.splitext(file)[0] + "_patch.v"
+        logging.info("Inserting patch wiring in file - %s" %(file))
         self.fileModifier(file, signalToObserve, signalToControl)
         verilogCode = codegen.visit(self.filewiseAst[file])
         with open(newFilename, "w") as f:
@@ -549,9 +570,11 @@ class VerilogGenerator(LogStructuring):
     
     # This method generates new verilog code for each file in the filelist
     def generateVerilog(self):
+        logging.info("Starting Patch Logic Insertion.....")
         for file in self.fileToSignalToObserve:
             self.genModifiedVerilogFile(file, self.fileToSignalToObserve[file],   \
                                               self.fileToSignalToControl[file])
+        logging.info("Patch logic insertion complete.")
 
 
 if __name__ == '__main__':

@@ -1,17 +1,24 @@
-2024-04-03 05:56:45,029 - INFO - Verilog signal parsing started for filelist filelist.f
-2024-04-03 05:56:45,029 - INFO - Pragma extractor initialized with filelist.f
-2024-04-03 05:56:45,029 - INFO - Parser initialized with filelist.f
-2024-04-03 05:56:45,552 - INFO - Filewise AST generated
-2024-04-03 05:56:45,553 - INFO - Files in filelist filelist.f - 
+2024-04-03 06:23:24,075 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-03 06:23:24,075 - INFO - Pragma extractor initialized with filelist.f
+2024-04-03 06:23:24,075 - INFO - Parser initialized with filelist.f
+2024-04-03 06:23:24,591 - INFO - Filewise AST generated
+2024-04-03 06:23:24,591 - INFO - Files in filelist filelist.f - 
 Sample.v
 
-2024-04-03 05:56:45,553 - INFO - Pragma distribution in file - Sample.v is 
-2 --> ((0, 0), ('fsm', 0, 0))
+2024-04-03 06:23:24,591 - INFO - Pragma distribution in file - Sample.v is 
+2 --> ((0, 0), ('signal', 0, 0))
 3 --> ((0, 0), None)
-5 --> (None, ('fsm', 0, 0))
-7 --> (None, ('fsm', 0, 0))
+5 --> (None, ('signal', 0, 0))
+7 --> (None, ('signal', 0, 0))
 9 --> (None, ('signal', 0, 0))
 
-2024-04-03 05:56:45,553 - INFO - Starting AST traversal for file - Sample.v
-2024-04-03 05:56:45,553 - INFO - AST traversal complete: Observable/Controllable signals found in file - Sample.v
-2024-04-03 05:56:46,078 - INFO - Filewise AST generated
+2024-04-03 06:23:24,591 - INFO - Starting AST traversal for file - Sample.v
+2024-04-03 06:23:24,591 - INFO - AST traversal complete: Observable/Controllable signals found in file - Sample.v
+2024-04-03 06:23:25,114 - INFO - Filewise AST generated
+2024-04-03 06:23:25,114 - INFO - Starting Patch Logic Insertion.....
+2024-04-03 06:23:25,114 - INFO - Inserting patch wiring in file - Sample.v
+2024-04-03 06:23:25,114 - INFO - Bits [0:0] of Input port A found as signal controlled
+2024-04-03 06:23:25,114 - INFO - Bits [0:0] of Output (wire) port out found as signal controlled
+2024-04-03 06:23:25,114 - INFO - Bits [0:0] of Output (reg) port out3 found as signal controlled
+2024-04-03 06:23:25,114 - INFO - Bits [0:0] of Wire test_wire found as signal controlled
+2024-04-03 06:23:25,130 - INFO - Patch logic insertion complete.
