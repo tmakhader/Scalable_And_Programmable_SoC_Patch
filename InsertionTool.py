@@ -4,6 +4,7 @@ import os
 import copy
 import logging                                                       # logger
 import pyverilog                                                     # PyVerilog
+import pyfiglet                                                      # ASCII formatter (Just for fun :) :))
 from pyverilog.vparser.parser import VerilogCodeParser               # PyVerilog Parser
 from pyverilog.vparser.ast import *                                  # PyVerilog AST
 from pyverilog.ast_code_generator.codegen import ASTCodeGenerator    # AST to verilog code generator
@@ -16,6 +17,7 @@ fileHandler = logging.FileHandler('verilog_parse.log', mode='w')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fileHandler.setFormatter(formatter)
 logging.getLogger().addHandler(fileHandler)
+logging.info("Started ASAP tool for Hardware Patching...\n\n " + pyfiglet.figlet_format("ASAP  PATCH"))
 #--------------------------------------------------------------------------------------------------#
 
 # Exception class for pragma parsing
@@ -195,7 +197,7 @@ class VerilogParser(LogStructuring):
 
         # For all files populates signals and appropriate observe/control properties
         for file in fileToAst:
-            logging.info("Starting AST traversal for file - %s"%(file))
+            logging.info("Scanning AST of file - %s for observable/controllable signals"%(file))
             signalToObserve, signalToControl = self.signalToPragma(fileToAst[file], fileToPragma[file])
             if bool(signalToObserve) | bool(signalToControl):
                 logging.info("AST traversal complete: Observable/Controllable signals found in file - %s"%(str(file)))
