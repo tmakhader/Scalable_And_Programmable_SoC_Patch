@@ -1,4 +1,4 @@
-2024-04-03 06:45:02,474 - INFO - Started Automatic, Secure And Programmable (ASAP) tool for Hardware Patching...
+2024-04-03 23:56:58,827 - INFO - Started Automatic, Scalable And Programmable (ASAP) tool for Hardware Patching...
 
      _    ____    _    ____     ____   _  _____ ____ _   _ 
    / \  / ___|  / \  |  _ \   |  _ \ / \|_   _/ ___| | | |
@@ -7,27 +7,37 @@
 /_/   \_\____/_/   \_\_|      |_| /_/   \_\_| \____|_| |_|
                                                           
 
-2024-04-03 06:45:02,475 - INFO - Verilog signal parsing started for filelist filelist.f
-2024-04-03 06:45:02,475 - INFO - Pragma extractor initialized with filelist.f
-2024-04-03 06:45:02,475 - INFO - Parser initialized with filelist.f
-2024-04-03 06:45:02,994 - INFO - Filewise AST generated
-2024-04-03 06:45:02,995 - INFO - List of files in filelist filelist.f - 
+2024-04-03 23:56:58,828 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-03 23:56:58,828 - INFO - Pragma extractor initialized with filelist.f
+2024-04-03 23:56:58,828 - INFO - Parser initialized with filelist.f
+2024-04-03 23:56:59,361 - INFO - Filewise AST generated
+2024-04-03 23:56:59,361 - INFO - List of files in filelist filelist.f - 
 Sample.v
 
-2024-04-03 06:45:02,995 - INFO - Pragma distribution in file - Sample.v is 
-2 --> ((0, 0), ('signal', 0, 0))
+2024-04-03 23:56:59,361 - INFO - Pragma distribution in file - Sample.v is 
 3 --> ((0, 0), None)
 5 --> (None, ('signal', 0, 0))
+6 --> ((0, 0), ('signal', 0, 0))
 7 --> (None, ('signal', 0, 0))
 9 --> (None, ('signal', 0, 0))
 
-2024-04-03 06:45:02,995 - INFO - Scanning AST of file - Sample.v for observable/controllable signals
-2024-04-03 06:45:02,995 - INFO - AST traversal complete: Observable/Controllable signals found in file - Sample.v
-2024-04-03 06:45:03,540 - INFO - Filewise AST generated
-2024-04-03 06:45:03,540 - INFO - Starting Patch Logic Insertion.....
-2024-04-03 06:45:03,540 - INFO - Inserting patch wiring in file - Sample.v
-2024-04-03 06:45:03,540 - INFO - Bits [0:0] of Input port A found as signal controlled
-2024-04-03 06:45:03,541 - INFO - Bits [0:0] of Output (wire) port out found as signal controlled
-2024-04-03 06:45:03,541 - INFO - Bits [0:0] of Output (reg) port out3 found as signal controlled
-2024-04-03 06:45:03,541 - INFO - Bits [0:0] of Wire test_wire found as signal controlled
-2024-04-03 06:45:03,556 - INFO - Patch logic insertion complete.
+2024-04-03 23:56:59,361 - INFO - Scanning AST of file - Sample.v for observable/controllable signals
+2024-04-03 23:56:59,361 - INFO - AST traversal complete: Observable/Controllable signals found in file - Sample.v
+2024-04-03 23:56:59,901 - INFO - Filewise AST generated
+2024-04-03 23:56:59,902 - INFO - Starting Patch Logic Insertion.....
+2024-04-03 23:56:59,902 - INFO - Inserting patch wiring in file - Sample.v
+2024-04-03 23:56:59,902 - INFO - Inserting control hooks in module - 'Sample'
+2024-04-03 23:56:59,902 - INFO - -- Bits [0:0] of Output (wire) port out found as signal controlled
+2024-04-03 23:56:59,902 - INFO - --- Bypassing driver of 'out' via 'out_controlled' for SRU control
+2024-04-03 23:56:59,902 - INFO - -- Bits [0:0] of Output (wire) port out2 found as signal controlled
+2024-04-03 23:56:59,902 - INFO - --- Bypassing driver of 'out2' via 'out2_controlled' for SRU control
+2024-04-03 23:56:59,902 - INFO - --Bits [0:0] of Output (reg) port out3 found as signal controlled
+2024-04-03 23:56:59,902 - INFO - --- Bypassing driver of 'out3' via register 'out3_controlled' for SRU control
+2024-04-03 23:56:59,902 - INFO - --Bits [0:0] of Wire test_wire found as signal controlled
+2024-04-03 23:56:59,902 - INFO - --- Bypassing driver of 'test_wire' via register 'test_wire_controlled' for SRU control
+2024-04-03 23:56:59,902 - INFO - Control hooks insertion in module 'Sample' complete
+2024-04-03 23:56:59,902 - INFO - Inserting observation hooks in module - 'Sample'
+2024-04-03 23:56:59,902 - INFO - Observed port 'B' or B_controlled doesn't exist in SRU LoadList, Tapping in to 'B' for observation
+2024-04-03 23:56:59,902 - INFO - Observed port 'out2' also found to be a controlled reg/wire/output. Tapping in to 'out2_controlled' for observation
+2024-04-03 23:56:59,902 - INFO - Observation hooks insertion in module 'Sample' complete
+2024-04-03 23:56:59,923 - INFO - Patch logic insertion complete.

@@ -1,13 +1,11 @@
 from __future__ import absolute_import
 from __future__ import print_function
 import os
-import copy
 import logging                                                       # logger
-import pyverilog                                                     # PyVerilog
-import pyfiglet                                                      # ASCII formatter (Just for fun :) :))
+import pyfiglet                                                      # ASCII formatter (Just for tooling fun :) :))
 from pyverilog.vparser.parser import VerilogCodeParser               # PyVerilog Parser
 from pyverilog.vparser.ast import *                                  # PyVerilog AST
-from pyverilog.ast_code_generator.codegen import ASTCodeGenerator    # AST to verilog code generator
+from pyverilog.ast_code_generator.codegen import ASTCodeGenerator    # Pyverilog AST to verilog code generator
 
 #--------------------------------------------- LOGGER SETUP----------------------------------------#
 # Configure logging - Done at file top so that all classes have it accessible
@@ -17,7 +15,7 @@ fileHandler = logging.FileHandler('verilog_parse.log', mode='w')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fileHandler.setFormatter(formatter)
 logging.getLogger().addHandler(fileHandler)
-logging.info("Started Automatic, Secure And Programmable (ASAP) tool for Hardware Patching...\n\n " + pyfiglet.figlet_format("ASAP  PATCH"))
+logging.info("Started Automatic, Scalable And Programmable (ASAP) tool for Hardware Patching...\n\n " + pyfiglet.figlet_format("ASAP  PATCH"))
 #--------------------------------------------------------------------------------------------------#
 
 # Exception class for pragma parsing
@@ -220,22 +218,73 @@ class VerilogGenerator(LogStructuring):
         self.controlPortOut = controlPortOut
     
     # Create necessary tap (assignment )logic for observe signals to propagate to SMU
-    def createObserveTaps(self, signalToObserve):
+    #                         <Observation of controlled signals>
+    #                  _________                               __________                                 
+    #                 |         |                             |          |                             
+    #    Driver ------| Wire/   | ----To SRU --- From SRU --- | Wire/(A')| -------- Loads 
+    #                 |Reg(A/A')|                             |Reg(A'/A) |                              
+    #                 |_________|                             |__________|
+    #                      | 
+    #                      |
+    #                  ObservePort
+    #                (SMU Observe Tap)   
+    def createObserveTaps(self, signalToObserve, sruDriverList):
         assignmentList = []
         observePortIndexLast = 0
         for signal in signalToObserve:
-            signalRangeLhs = signalToObserve[signal][0]
-            signalRangeRhs = signalToObserve[signal][1]
-            observePortRangeLhs = observePortIndexLast + (signalRangeRhs - signalRangeLhs)
-            observePortRangeRhs = observePortIndexLast
-            Lhs = Partselect(Identifier(self.observePort),  \
-                            IntConst(observePortRangeLhs), \
-                            IntConst(observePortRangeRhs))
-            Rhs = Partselect(Identifier(signal),  \
-                            IntConst(signalRangeLhs), \
-                            IntConst(signalRangeRhs))
-            assignmentList.append(Assign(Lhs, Rhs))
-            observePortIndexLast = observePortRangeLhs + 1
+            # If the observed signal is in SRU driver list:
+            # -- assign <observePort[<range>]> = <signal[OBSERVE_START:OBSERVE_END]> 
+            if any(signal == controlSignal[0] for controlSignal in sruDriverList):
+                logging.info("Observed port '%s' also found to be a controlled input. Tapping in to '%s' for observation" %(signal, \
+                                                                                                                            signal))
+                signalRangeLhs = signalToObserve[signal][0]
+                signalRangeRhs = signalToObserve[signal][1]
+                observePortRangeLhs = observePortIndexLast + (signalRangeRhs - signalRangeLhs)
+                observePortRangeRhs = observePortIndexLast
+                Lhs = Partselect(Identifier(self.observePort),  \
+                                IntConst(observePortRangeLhs), \
+                                IntConst(observePortRangeRhs))
+                Rhs = Partselect(Identifier(signal),  \
+                                IntConst(signalRangeLhs), \
+                                IntConst(signalRangeRhs))
+                assignmentList.append(Assign(Lhs, Rhs))
+                observePortIndexLast = observePortRangeLhs + 1
+            # If the counter part (+/- "_controlled") of observed signal is in SRU sriver list as well,
+            # -- we should observe this as the original observed signal would be the patched version
+            # -- assign <observePort[<range>]> = <couterPart(signal)[OBSERVE_START:OBSERVE_END]> 
+            elif any(self.signalCounterPart(signal) == controlSignal[0] for controlSignal in sruDriverList):
+                logging.info("Observed port '%s' also found to be a controlled reg/wire/output. Tapping in to '%s' for observation" %(signal,  \
+                                                                                                               self.signalCounterPart(signal)))
+                signalRangeLhs = signalToObserve[signal][0]
+                signalRangeRhs = signalToObserve[signal][1]
+                observePortRangeLhs = observePortIndexLast + (signalRangeRhs - signalRangeLhs)
+                observePortRangeRhs = observePortIndexLast
+                Lhs = Partselect(Identifier(self.observePort),  \
+                                IntConst(observePortRangeLhs), \
+                                IntConst(observePortRangeRhs))
+                Rhs = Partselect(Identifier(self.signalCounterPart(signal)),  \
+                                IntConst(signalRangeLhs), \
+                                IntConst(signalRangeRhs))
+                assignmentList.append(Assign(Lhs, Rhs))
+                observePortIndexLast = observePortRangeLhs + 1
+            # If the observed signal of the counterPart is not in SRU driver list,
+            # it is not controlled and we can safely observe the original signal
+            else:
+                logging.info("Observed port '%s' or %s doesn't exist in SRU LoadList, Tapping in to '%s' for observation" %(signal,  \
+                                                                                                     self.signalCounterPart(signal), \
+                                                                                                                            signal))
+                signalRangeLhs = signalToObserve[signal][0]
+                signalRangeRhs = signalToObserve[signal][1]
+                observePortRangeLhs = observePortIndexLast + (signalRangeRhs - signalRangeLhs)
+                observePortRangeRhs = observePortIndexLast
+                Lhs = Partselect(Identifier(self.observePort),  \
+                                IntConst(observePortRangeLhs), \
+                                IntConst(observePortRangeRhs))
+                Rhs = Partselect(Identifier(signal),  \
+                                IntConst(signalRangeLhs), \
+                                IntConst(signalRangeRhs))
+                assignmentList.append(Assign(Lhs, Rhs))
+                observePortIndexLast = observePortRangeLhs + 1
         return assignmentList, observePortIndexLast - 1
     
     def signalCounterPart(self, signal):
@@ -332,10 +381,12 @@ class VerilogGenerator(LogStructuring):
             if isinstance(port.second, Wire) and isinstance(port.first, Input):
                 newPorts.append(port)
                 if port.first.name in signalToControl:
-                    logging.info("Bits [%s:%s] of Input port %s found as %s controlled"%(signalToControl[port.first.name][1],  \
-                                                                                     signalToControl[port.first.name][2],  \
-                                                                                     port.first.name,                      \
-                                                                                     signalToControl[port.first.name][0]))
+                    logging.info("-- Bits [%s:%s] of Input port %s found as %s controlled"%(signalToControl[port.first.name][1],  \
+                                                                                            signalToControl[port.first.name][2],  \
+                                                                                            port.first.name,                      \
+                                                                                            signalToControl[port.first.name][0]))
+                    logging.info("--- Bypassing load of '%s' via '%s' for SRU control"%(port.first.name,                          \
+                                                                                      port.second.name + "_controlled"))
                     newWire  = Decl((Wire(name = port.second.name + "_controlled", \
                                           width = port.second.width,               \
                                           signed = port.second.signed,             \
@@ -363,10 +414,12 @@ class VerilogGenerator(LogStructuring):
             elif isinstance(port.second, Wire) and isinstance(port.first, Output):
                 newPorts.append(port)
                 if port.first.name in signalToControl:
-                    logging.info("Bits [%s:%s] of Output (wire) port %s found as %s controlled"%(signalToControl[port.first.name][1], \
-                                                                                                 signalToControl[port.first.name][2], \
-                                                                                                 port.first.name,                     \
-                                                                                                 signalToControl[port.first.name][0]))
+                    logging.info("-- Bits [%s:%s] of Output (wire) port %s found as %s controlled"%(signalToControl[port.first.name][1], \
+                                                                                                    signalToControl[port.first.name][2], \
+                                                                                                    port.first.name,                     \
+                                                                                                    signalToControl[port.first.name][0]))
+                    logging.info("--- Bypassing driver of '%s' via '%s' for SRU control"%(port.first.name,                               \
+                                                                                          port.second.name + "_controlled"))
                     newWire  = Decl((Wire(name = port.second.name + "_controlled", \
                                           width = port.second.width,               \
                                           signed = port.second.signed,             \
@@ -393,10 +446,12 @@ class VerilogGenerator(LogStructuring):
             # -- Change all drivers of A to A_controlled 
             elif isinstance(port.second, Reg) and isinstance(port.first, Output):
                 if port.first.name in signalToControl:
-                    logging.info("Bits [%s:%s] of Output (reg) port %s found as %s controlled"%(signalToControl[port.first.name][1], \
-                                                                                                signalToControl[port.first.name][2], \
-                                                                                                port.first.name,                     \
-                                                                                                signalToControl[port.first.name][0]))
+                    logging.info("--Bits [%s:%s] of Output (reg) port %s found as %s controlled"%(signalToControl[port.first.name][1], \
+                                                                                                  signalToControl[port.first.name][2], \
+                                                                                                  port.first.name,                     \
+                                                                                                  signalToControl[port.first.name][0]))
+                    logging.info("--- Bypassing driver of '%s' via register '%s' for SRU control"%(port.first.name,                    \
+                                                                                                   port.second.name + "_controlled"))
                     newReg   = Decl((Reg(name = port.second.name + "_controlled",  \
                                          width = port.second.width,                \
                                          signed = port.second.signed,
@@ -446,10 +501,12 @@ class VerilogGenerator(LogStructuring):
                 if isinstance(item.list[0], Reg):   # NOTE: item.list is a tuple
                     regDecl = item.list[0]
                     if regDecl.name in signalToControl:
-                        logging.info("Bits [%s:%s] of Register %s found as %s controlled"%(signalToControl[regDecl.name][1], \
-                                                                                           signalToControl[regDecl.name][2], \
-                                                                                           regDecl.name,                     \
+                        logging.info("--Bits [%s:%s] of Register %s found as %s controlled"%(signalToControl[regDecl.name][1], \
+                                                                                           signalToControl[regDecl.name][2],   \
+                                                                                           regDecl.name,                       \
                                                                                            signalToControl[regDecl.name][0]))
+                        logging.info("--- Bypassing driver of '%s' via register '%s' for SRU control"%(regDecl.name,           \
+                                                                                                       regDecl.name,+ "_controlled"))
                         # Making a Declaration node passed with list (tuple) of the new register - A_controlled
                         newReg =  Decl((Reg(name = regDecl.name + "_controlled",   \
                                             width = regDecl.width,                 \
@@ -485,10 +542,12 @@ class VerilogGenerator(LogStructuring):
                 elif isinstance(item.list[0], Wire):
                     wireDecl = item.list[0]
                     if wireDecl.name in signalToControl:
-                        logging.info("Bits [%s:%s] of Wire %s found as %s controlled"%(signalToControl[wireDecl.name][1], \
-                                                                                       signalToControl[wireDecl.name][2], \
-                                                                                       wireDecl.name,                     \
-                                                                                       signalToControl[wireDecl.name][0]))
+                        logging.info("--Bits [%s:%s] of Wire %s found as %s controlled"%(signalToControl[wireDecl.name][1], \
+                                                                                         signalToControl[wireDecl.name][2], \
+                                                                                         wireDecl.name,                     \
+                                                                                         signalToControl[wireDecl.name][0]))
+                        logging.info("--- Bypassing driver of '%s' via register '%s' for SRU control"%(wireDecl.name,       \
+                                                                                                       wireDecl.name + "_controlled"))
                         # Making a Declaration node passed with list (tuple) of the new wire - A_controlled
                         newWire = Decl((Wire(name = wireDecl.name + "_controlled",  \
                                             width = wireDecl.width,                 \
@@ -534,14 +593,14 @@ class VerilogGenerator(LogStructuring):
         moduleNode.portlist.ports = tuple(amendedPort)
         items_list = list(moduleNode.items)
         for assignment in assignmentList:
-            items_list.insert(0, assignment)
+            items_list.append(assignment)
         moduleNode.items = tuple(items_list)
+        return sruDriverListIo + sruDriverListDec
 
 
-    
     # This method modifies the module AST node to add observe ports and assignments
-    def addPumpsForObserveSignals(self, moduleNode, signalToObserve):
-        assignmentList, observePortIndexLast = self.createObserveTaps(signalToObserve)
+    def addLogicForObservation(self, moduleNode, signalToObserve, sruDriverList):
+        assignmentList, observePortIndexLast = self.createObserveTaps(signalToObserve, sruDriverList)
         outputWidth = Width(msb=IntConst(observePortIndexLast), lsb=IntConst(0))
         observePortOutput = Ioport(Output(self.observePort, width=outputWidth))
         amendedPort = list(moduleNode.portlist.ports)
@@ -558,7 +617,12 @@ class VerilogGenerator(LogStructuring):
         moduleDefs = ast.description.definitions
         for moduleDef in moduleDefs:
             if isinstance(moduleDef, ModuleDef):
-                self.addLogicForControl(moduleDef, signalToControl)
+                logging.info("Inserting control hooks in module - '%s'" %(moduleDef.name))
+                sruDriverList = self.addLogicForControl(moduleDef, signalToControl)
+                logging.info("Control hooks insertion in module '%s' complete"%(moduleDef.name))
+                logging.info("Inserting observation hooks in module - '%s'"%(moduleDef.name))
+                self.addLogicForObservation(moduleDef, signalToObserve, sruDriverList)
+                logging.info("Observation hooks insertion in module '%s' complete"%(moduleDef.name))
     
     # This method generates new verilog code for a file
     def genModifiedVerilogFile(self, file, signalToObserve, signalToControl):
@@ -585,7 +649,7 @@ if __name__ == '__main__':
     parser = VerilogParser(filelist)
     fileToSignalToObserve, fileToSignalToControl = parser.fileToSignalToPragma()
     filewiseAst = parser.fileWiseAst()
-    OBSERVE_PORT_NAME = "observe_sig"
+    OBSERVE_PORT_NAME = "observe_port"
     CONTROL_PORT_IN_NAME = "control_port_in"
     CONTROL_PORT_OUT_NAME = "control_port_out"
     verilogGenerator = VerilogGenerator(filewiseAst,              \
