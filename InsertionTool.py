@@ -41,13 +41,13 @@ class LogStructuring:
             listData += "%s\n"%(value)    
         return listData
 
-    def logTreeInfo(self, tree, initialString = "\n", indent=0):
+    def logTreeInfo(self, tree, initialString = "", indent=0):
         for key, value in tree.items():
-            initialString += ("  " * indent + str(key))
+            initialString += ("\n" + "  " * indent + str(key[0]) + "(%s)"%(str(key[1])))
             if isinstance(value, dict):
-                initialString = self.logTreeInfo(value, indent + 1, initialString)
+                initialString = self.logTreeInfo(value, indent = indent + 1, initialString = initialString)
             else:
-                initialString += ("  " * (indent + 1) + str(value))
+                initialString +=  ("\n" +"  " * (indent + 1) + str(value))
         return initialString
         
 
@@ -126,23 +126,24 @@ class PragmaExtractor(LogStructuring):
 class InstantiationTree:
     def __init__(self, topModule, moduleToAst):
         self.topModule = topModule
-        self.instanceTree = {}
         self.moduleToAst = moduleToAst
-        self.populateTree(moduleToAst[topModule], \
+        self.instanceTree = self.populateTree(moduleToAst[topModule], \
                           isTopModule=True)
-        logging.info("Instantiation tree generated - \n")
+        logging.info("Instantiation tree generated - ")
 
     # Method used to recursively populate the instantiation tree
     def populateTree(self, ast, isTopModule = False):
+        treeNode = {}
         if isTopModule:
-            self.instanceTree.update({("TOP", self.topModule):
-                                      self.populateTree(ast)})
-        for item in ast.items:
-            if isinstance(item, InstanceList):
-                for instance in item.instances:
-                    self.instanceTree.update({(instance.name, instance.module): \
-                                              self.populateTree(self.moduleToAst[instance.module])})
-        return None
+            treeNode.update({("TOP", self.topModule):  \
+                              self.populateTree(ast)})
+        else:
+            for item in ast.items:
+                if isinstance(item, InstanceList):
+                    for instance in item.instances:
+                        treeNode.update({(instance.name, instance.module): \
+                                        self.populateTree(self.moduleToAst[instance.module])})
+        return treeNode if treeNode else None
                     
 
 # Class to parse the filelist
@@ -159,6 +160,7 @@ class VerilogParser(LogStructuring):
         logging.info("Module to AST hash map generated")
         self.tree            = InstantiationTree(topModule, self.moduleToAst).instanceTree
         logging.info("Instantiation tree generated \n %s"%(self.logTreeInfo(self.tree)))
+        #print(str(self.tree))
 
     def moduleWiseAst(self):
         moduleToAst = {}
@@ -272,11 +274,13 @@ class VerilogGenerator(LogStructuring):
         self.filewiseAst           = filewiseAst
         self.fileToModuleToSignalToObserve = fileToModuleToSignalToObserve
         self.fileToModuleToSignalToControl = fileToModuleToSignalToControl
-        self.observePort           = observePort
-        self.controlPortIn         = controlPortIn
-        self.controlPortOut        = controlPortOut
-        self.instanceTree          = instanceTree
-        self.topModule             = topModule
+        self.observePort                   = observePort
+        self.controlPortIn                 = controlPortIn
+        self.controlPortOut                = controlPortOut
+        self.instanceTree                  = instanceTree
+        self.topModule                     = topModule
+        self.moduleToObservePortWidth      = {}
+        self.moduleToControlPortWidth      = {} 
     
     # Create necessary tap (assignment )logic for observe signals to propagate to SMU
     #                         <Observation of controlled signals>
@@ -713,9 +717,7 @@ class VerilogGenerator(LogStructuring):
     # Node with value - None indicates a leaf module
     def insertInterModuleHooks(self, moduleNode, treeNode, 
                                                  moduleToObserveWidth,  \
-                                                 moduleToControlWidth,  \
-                                                 controlPortWidth = 0,  \
-                                                 observePortWidth = 0):   
+                                                 moduleToControlWidth):   
         if moduleNode is not None:
             # The moduleNode is the current module being processed
             # The value of treeNode[moduleNode] are the instances of other modules within that module
@@ -729,74 +731,89 @@ class VerilogGenerator(LogStructuring):
             if childModules is not None:  # Check if this is not a leaf module
                 # Non-leaf module operations
                 for childModule in childModules:
-                    # Recurse through child instances before hooking up ports
+                    logging.info("--- Adding instance hooks for child module '%s' of module '%s'" %(childModule[1], moduleNode[1]))
+                    # Recurse through child instances before hooking up ports (only if it has not been traversed before
+                    # no prevent duplicate hooks)
                     # This would update the controlPortWidth and observePortWidth 
-                    self.insertInterModuleHooks(self, childModule, {childModule: treeNode[moduleNode][childModule]},     \
-                                                                    moduleToObserveWidth, \
-                                                                    moduleToControlWidth, \
-                                                                    controlPortWidth,     \
-                                                                    observePortWidth )
+                    if childModule[1] not in self.moduleToControlPortWidth and \
+                       childModule[1] not in self.moduleToObservePortWidth:
+                        self.insertInterModuleHooks(childModule, {childModule: treeNode[moduleNode][childModule]},  \
+                                                                moduleToObserveWidth,                              \
+                                                                moduleToControlWidth)
                     for item in items:
                         if isinstance(item, InstanceList):
                             instances = item.instances
                             for instance in instances:
                                 if isinstance(instance, Instance):
-                                    if instance.name == childModule[0] and observePortWidth > 0:
+                                    # Ports in the instance portlist
+                                    instancePorts = list(instance.portlist)
+                                    if instance.name == childModule[0] and self.moduleToObservePortWidth[childModule[1]] > 0:
                                         # Port-Mapping for observe port
-                                        lhs = Identifier(self.observePort)
-                                        Rhs = Partselect(Identifier(self.observePort + "_inst"),                         \
-                                                         msb = IntConst(observePortInstIndex + observePortWidth - 1),    \
+                                        lhs = self.observePort
+                                        Rhs = Partselect(Identifier(self.observePort + "_inst"),                                                      \
+                                                         msb = IntConst(observePortInstIndex + self.moduleToObservePortWidth[childModule[1]] - 1),    \
                                                          lsb = IntConst(observePortInstIndex))
-                                        instance.portlist.ports.append(PortArg(lhs,Rhs))
-                                        observePortInstIndex += observePortWidth
-                                    if instance.name == childModule[0] and controlPortWidth > 0:
-                                        # Port-Mapping for ControlIn port
-                                        lhs = Identifier(self.controlPortIn)
-                                        Rhs = Partselect(Identifier(self.controlPortIn + "_inst"),                       \
-                                                         msb = IntConst(controlPortInstIndex + controlPortWidth - 1),    \
-                                                         lsb = IntConst(controlPortInstIndex))
-                                        instance.portlist.ports.append(PortArg(lhs,Rhs))
-                                        # Port-Mapping for ControlOut port
-                                        lhs = Identifier(self.controlPortOut)
-                                        Rhs = Partselect(Identifier(self.controlPortOut + "_inst"),       \
-                                                         msb = IntConst(controlPortInstIndex + controlPortWidth - 1),    \
-                                                         lsb = IntConst(controlPortInstIndex))
-                                        instance.portlist.ports.append(PortArg(lhs,Rhs))
-                                        controlPortInstIndex += controlPortWidth
                                         
-                                        instance.portlist.ports.append()
+                                        instancePorts.append(PortArg(lhs,Rhs))
+                                        observePortInstIndex += self.moduleToObservePortWidth[childModule[1]]
+                                    if instance.name == childModule[0] and self.moduleToControlPortWidth[childModule[1]] > 0:
+                                        # Port-Mapping for ControlIn port
+                                        lhs = self.controlPortIn
+                                        Rhs = Partselect(Identifier(self.controlPortIn + "_inst"),                                                    \
+                                                         msb = IntConst(controlPortInstIndex + self.moduleToControlPortWidth[childModule[1]] - 1),    \
+                                                         lsb = IntConst(controlPortInstIndex))
+                                        instancePorts.append(PortArg(lhs,Rhs))
+                                        # Port-Mapping for ControlOut port
+                                        lhs = self.controlPortOut
+                                        Rhs = Partselect(Identifier(self.controlPortOut + "_inst"),                                                   \
+                                                         msb = IntConst(controlPortInstIndex + self.moduleToControlPortWidth[childModule[1]] - 1),    \
+                                                         lsb = IntConst(controlPortInstIndex))
+                                        instancePorts.append(PortArg(lhs,Rhs))
+                                        controlPortInstIndex += self.moduleToControlPortWidth[childModule[1]]
+                                    instance.portlist = tuple(instancePorts)
             # The mmodule has both internal and instance-wise observe ports
             if observePortInstIndex > 0 and moduleToObserveWidth[moduleNode[1]] > 0:
+                logging.info("-- Module '%s' has both internal and instance-wise observe hooks - Concatenating them to the module observe port" %(moduleNode[1]))
                 # Declare <observePort>_inst wire
                 observePortInstWidth = Width(msb = IntConst(observePortInstIndex - 1), lsb = IntConst(0))
-                items.insert(0, Decl((Wire(self.observePort + "_inst", width = observePortInstWidth)),))
+                items.insert(0, Decl((Wire(self.observePort + "_inst", width = observePortInstWidth),)))
                 # Add assignment: assign <observePort> = {<obervePort>_int, <observePort>_inst}
                 lhs = Identifier(self.observePort)
                 concatWireOne = Identifier(self.observePort + "_int")
                 concatWireTwo = Identifier(self.observePort + "_inst")
                 rhs = Concat([concatWireOne, concatWireTwo])
                 items.append(Assign(lhs, rhs))
+                self.getAstForModule(moduleNode[1]).items = tuple(items)
             # The module has instance-wise but no internal observe ports
             elif observePortInstIndex > 0 and moduleToObserveWidth[moduleNode[1]] == 0:
+                logging.info("-- Module '%s' has only observe hooks from instances - Assigning them to the module observe port" %(moduleNode[1]))
                 # Declare <observePort>_inst wire
                 observePortInstWidth = Width(msb = IntConst(observePortInstIndex - 1), lsb = IntConst(0))
-                items.insert(0, Decl((Wire(self.observePort + "_inst", width = observePortInstWidth)),))
+                items.insert(0, Decl((Wire(self.observePort + "_inst", width = observePortInstWidth),)))
                 # Add assignment: assign <observePort> = <observePort>_inst
                 lhs = Identifier(self.observePort)
                 rhs = Identifier(self.observePort + "_inst")
                 items.append(Assign(lhs, rhs))
+                self.getAstForModule(moduleNode[1]).items = tuple(items)
+
             # The module has internal but no instance-wise observe ports
             elif observePortInstIndex == 0 and moduleToObserveWidth[moduleNode[1]] > 0:
+                logging.info("-- Module '%s' has only internal observe hooks - Assigning them to the module observe port" %(moduleNode[1]))
                 # Add assignment: assign <observePort> = <observePort>_int
                 lhs = Identifier(self.observePort)
                 rhs = Identifier(self.observePort + "_int")
-                items.append(Assign(lhs, rhs))       
+                items.append(Assign(lhs, rhs))  
+                self.getAstForModule(moduleNode[1]).items = tuple(items)  
+
+            else:
+                logging.info("-- Module '%s' has neither internal not instance-wise observe hooks" %(moduleNode[1]))
 
             # The module has both internal and instance-wise control ports
             if controlPortInstIndex > 0 and moduleToControlWidth[moduleNode[1]] > 0:
+                logging.info("-- Module '%s' has both internal and instance-wise control hooks - Concatenating them to the module control port" %(moduleNode[1]))
                 # Declare wire <controlPortIn_inst>
                 controlPortInstWidth = Width(msb = IntConst(controlPortInstIndex - 1), lsb = IntConst(0))
-                items.insert(0, Decl((Wire(self.controlPortIn + "_inst", width = controlPortInstWidth)),))
+                items.insert(0, Decl((Wire(self.controlPortIn + "_inst", width = controlPortInstWidth),)))
                 # Add assignment assign <controlPortIn> = {<controlPortIn>_int, <controlPortIn>_inst}
                 lhs = Identifier(self.controlPortIn)
                 concatWireOne = Identifier(self.controlPortIn + "_int")
@@ -804,18 +821,21 @@ class VerilogGenerator(LogStructuring):
                 rhs = Concat([concatWireOne, concatWireTwo])
                 items.append(Assign(lhs, rhs))
                 # Declare wire <controlPortOut_inst>
-                items.insert(0, Decl((Wire(self.controlPortOut + "inst", width = controlPortInstWidth)),))
+                items.insert(0, Decl((Wire(self.controlPortOut + "inst", width = controlPortInstWidth),)))
                 # Add assignment assign {<controlPortOut>_int, <controlPortOut>_inst} = <controlPortOut>
                 concatWireOne = Identifier(self.controlPortOut + "_int")
                 concatWireTwo = Identifier(self.controlPortOut + "_inst")
                 lhs = Concat([concatWireOne, concatWireTwo])
                 rhs = Identifier(self.controlPortOut)
                 items.append(Assign(lhs, rhs))
+                self.getAstForModule(moduleNode[1]).items = tuple(items)
+
             # The module has instance-wise but no internal control ports
             elif controlPortInstIndex > 0 and moduleToControlWidth[moduleNode[1]] == 0:
+                logging.info("-- Module '%s' has only control hooks from instances - Assigning them to the module control port" %(moduleNode[1]))
                 # Declare wire <controlPortIn_inst>
                 controlPortInstWidth = Width(msb = IntConst(controlPortInstIndex - 1), lsb = IntConst(0))
-                items.insert(0, Decl((Wire(self.controlPortIn + "_inst", width = controlPortInstWidth)),))
+                items.insert(0, Decl((Wire(self.controlPortIn + "_inst", width = controlPortInstWidth),)))
                 # Add assignment assign <controlPortIn> = <controlPortIn>_inst
                 lhs = Identifier(self.controlPortIn)
                 rhs = Identifier(self.controlPortIn + "_inst")
@@ -824,8 +844,10 @@ class VerilogGenerator(LogStructuring):
                 lhs = Identifier(self.controlPortOut + "_inst")
                 rhs = Identifier(self.controlPortOut)
                 items.append(Assign(lhs, rhs))
+
             # The module has internal but no instance-wise control ports
             elif controlPortInstIndex == 0 and moduleToControlWidth[moduleNode[1]] > 0:
+                logging.info("-- Module '%s' has only internal control hooks - Assigning them to the module control port" %(moduleNode[1]))
                 # Add assignment assign <controlPortIn> = <controlPortIn>_int
                 lhs = Identifier(self.controlPortIn)
                 rhs = Identifier(self.controlPortIn + "_int")
@@ -836,17 +858,19 @@ class VerilogGenerator(LogStructuring):
                 items.append(Assign(lhs, rhs))
 
             # Final observe/control port width     
-            observePortWidth = observePortInstIndex + moduleToObserveWidth[moduleNode[1]]
-            controlPortWidth = controlPortInstIndex + moduleToControlWidth[moduleNode[1]]
+            self.moduleToObservePortWidth[moduleNode[1]] = observePortInstIndex + moduleToObserveWidth[moduleNode[1]]
+            self.moduleToControlPortWidth[moduleNode[1]] = controlPortInstIndex + moduleToControlWidth[moduleNode[1]]
             
             # IO Port declaration for the current module
             if observePortInstIndex != 0 or moduleToObserveWidth[moduleNode[1]] != 0: 
-                observePortTotalWidth = Width(msb = IntConst(observePortWidth-1), lsb = IntConst(0))
+                logging.info("-- Inserting primary observe port in module '%s'" %(moduleNode[1]))
+                observePortTotalWidth = Width(msb = IntConst(self.moduleToObservePortWidth[moduleNode[1]]-1), lsb = IntConst(0))
                 observePortOutput = Ioport(Output(self.observePort, width = observePortTotalWidth))
                 ports.append(observePortOutput)
                 self.getAstForModule(moduleNode[1]).portlist.ports = tuple(ports)
             if  controlPortInstIndex != 0 or moduleToControlWidth[moduleNode[1]] != 0:
-                controlPortTotalWidth = Width(msb = IntConst(controlPortWidth-1), lsb = IntConst(0))
+                logging.info("-- Inserting primary control port in module '%s'" %(moduleNode[1]))
+                controlPortTotalWidth = Width(msb = IntConst(self.moduleToControlPortWidth[moduleNode[1]]-1), lsb = IntConst(0))
                 controlPortOutput = Ioport(Output(self.controlPortIn, width =controlPortTotalWidth))
                 controlPortInput  = Ioport(Input(self.controlPortOut, width =controlPortTotalWidth))
                 ports.extend([controlPortOutput, controlPortInput])

@@ -10,10 +10,10 @@ module Sample(
     wire test_wire_2; // #pragma control signal 0:0
     assign out = A&B; 
 
-    Or inst (.in(A),
+    Or inst1 (.in(A),
              .out(test_wire));
 
-    Or inst (.in(B),
+    Or inst2 (.in(B),
              .out(test_wire_2));
 
     assign out2 = test_wire|B|out3|test_wire_2; 
@@ -26,5 +26,7 @@ module Or(
     input in,
     output out
 );
-    assign out = ~in;
+    wire inter; // #pragma observe 0:0 control signal 0:0
+    assign inter = ~in; 
+    assign out = inter;
 endmodule
