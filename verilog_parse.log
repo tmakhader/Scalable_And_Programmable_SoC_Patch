@@ -1,19 +1,19 @@
-2024-04-07 07:50:15,484 - INFO - Started Automatic, Scalable And Programmable (ASAP) tool for Hardware Patching...
+2024-04-07 08:34:47,116 - INFO - Started Automatic, Scalable And Programmable (ASAP) tool for Hardware Patching...
 
-     _    ____    _    ____     ____   _  _____ ____ _   _  
-   / \  / ___|  / \  |  _ \   |  _ \ / \|_   _/ ___| | | | 
-  / _ \ \___ \ / _ \ | |_) |  | |_) / _ \ | || |   | |_| | 
- / ___ \ ___) / ___ \|  __/   |  __/ ___ \| || |___|  _  | 
-/_/   \_\____/_/   \_\_|      |_| /_/   \_\_| \____|_| |_| 
-                                                           
+     _    ____    _    ____     ____   _  _____ ____ _   _ 
+   / \  / ___|  / \  |  _ \   |  _ \ / \|_   _/ ___| | | |
+  / _ \ \___ \ / _ \ | |_) |  | |_) / _ \ | || |   | |_| |
+ / ___ \ ___) / ___ \|  __/   |  __/ ___ \| || |___|  _  |
+/_/   \_\____/_/   \_\_|      |_| /_/   \_\_| \____|_| |_|
+                                                          
 
-2024-04-07 07:50:15,484 - INFO - Verilog signal parsing started for filelist filelist.f
-2024-04-07 07:50:15,484 - INFO - Parser initialized with filelist.f
-2024-04-07 07:50:15,484 - INFO - Pragma extractor initialized with filelist.f
-2024-04-07 07:50:15,485 - INFO - List of files in filelist filelist.f - 
+2024-04-07 08:34:47,116 - INFO - Verilog signal parsing started for filelist filelist.f
+2024-04-07 08:34:47,116 - INFO - Parser initialized with filelist.f
+2024-04-07 08:34:47,116 - INFO - Pragma extractor initialized with filelist.f
+2024-04-07 08:34:47,116 - INFO - List of files in filelist filelist.f - 
 Sample.v
 
-2024-04-07 07:50:15,485 - INFO - Pragma distribution in file - Sample.v is 
+2024-04-07 08:34:47,117 - INFO - Pragma distribution in file - Sample.v is 
 2 --> ((0, 0), ('signal', 0, 0))
 3 --> ((0, 0), None)
 5 --> (None, ('signal', 0, 0))
@@ -23,60 +23,59 @@ Sample.v
 10 --> (None, ('signal', 0, 0))
 29 --> ((0, 0), ('signal', 0, 0))
 
-2024-04-07 07:50:16,001 - INFO - Filewise AST generated
-2024-04-07 07:50:16,001 - INFO - File to AST hash map generated
-2024-04-07 07:50:16,001 - INFO - Module to AST hash map generated
-2024-04-07 07:50:16,002 - INFO - Instantiation tree generated - 
-2024-04-07 07:50:16,002 - INFO - Instantiation tree generated 
+2024-04-07 08:34:47,637 - INFO - Filewise AST generated
+2024-04-07 08:34:47,637 - INFO - File to AST hash map generated
+2024-04-07 08:34:47,637 - INFO - Module to AST hash map generated
+2024-04-07 08:34:47,637 - INFO - Instantiation tree generated 
  
 TOP(Sample)
   inst1(Or)
     None
   inst2(Or)
     None
-2024-04-07 07:50:16,002 - INFO - Scanning AST of file - Sample.v for observable/controllable signals
-2024-04-07 07:50:16,002 - INFO - AST traversal complete: Observable/Controllable signals found in file - Sample.v
-2024-04-07 07:50:16,002 - INFO - Starting cross-module patch hook insertion.....
-2024-04-07 07:50:16,002 - INFO - Stage 1 AST modification: Inserting internal observe/control hooks in file - Sample.v
-2024-04-07 07:50:16,002 - INFO - Inserting control hooks in module - 'Sample'
-2024-04-07 07:50:16,002 - INFO - -- Bits [0:0] of Input port A found as signal controlled
-2024-04-07 07:50:16,002 - INFO - --- Bypassing load of 'A' via 'A_controlled' for SRU control
-2024-04-07 07:50:16,002 - INFO - -- Bits [0:0] of Output (wire) port out found as signal controlled
-2024-04-07 07:50:16,002 - INFO - --- Bypassing driver of 'out' via 'out_controlled' for SRU control
-2024-04-07 07:50:16,002 - INFO - -- Bits [0:0] of Output (wire) port out2 found as signal controlled
-2024-04-07 07:50:16,002 - INFO - --- Bypassing driver of 'out2' via 'out2_controlled' for SRU control
-2024-04-07 07:50:16,002 - INFO - --Bits [0:0] of Output (reg) port out3 found as signal controlled
-2024-04-07 07:50:16,002 - INFO - --- Bypassing driver of 'out3' via register 'out3_controlled' for SRU control
-2024-04-07 07:50:16,002 - INFO - --Bits [0:0] of Wire test_wire found as signal controlled
-2024-04-07 07:50:16,002 - INFO - --- Bypassing driver of 'test_wire' via register 'test_wire_controlled' for SRU control
-2024-04-07 07:50:16,002 - INFO - --Bits [0:0] of Wire test_wire_2 found as signal controlled
-2024-04-07 07:50:16,002 - INFO - --- Bypassing driver of 'test_wire_2' via register 'test_wire_2_controlled' for SRU control
-2024-04-07 07:50:16,002 - INFO - Control hooks insertion in module 'Sample' complete
-2024-04-07 07:50:16,002 - INFO - Inserting observation hooks in module - 'Sample'
-2024-04-07 07:50:16,002 - INFO - Observed port 'A' also found to be a controlled input. Tapping in to 'A' for observation
-2024-04-07 07:50:16,002 - INFO - Observed port 'B' or B_controlled doesn't exist in SRU LoadList, Tapping in to 'B' for observation
-2024-04-07 07:50:16,002 - INFO - Observed port 'out2' also found to be a controlled reg/wire/output. Tapping in to 'out2_controlled' for observation
-2024-04-07 07:50:16,002 - INFO - Observation hooks insertion in module 'Sample' complete
-2024-04-07 07:50:16,002 - INFO - Inserting control hooks in module - 'Or'
-2024-04-07 07:50:16,002 - INFO - --Bits [0:0] of Wire inter found as signal controlled
-2024-04-07 07:50:16,002 - INFO - --- Bypassing driver of 'inter' via register 'inter_controlled' for SRU control
-2024-04-07 07:50:16,002 - INFO - Control hooks insertion in module 'Or' complete
-2024-04-07 07:50:16,002 - INFO - Inserting observation hooks in module - 'Or'
-2024-04-07 07:50:16,002 - INFO - Observed port 'inter' also found to be a controlled reg/wire/output. Tapping in to 'inter_controlled' for observation
-2024-04-07 07:50:16,002 - INFO - Observation hooks insertion in module 'Or' complete
-2024-04-07 07:50:16,002 - INFO - Stage 1 AST modification complete
-2024-04-07 07:50:16,002 - INFO - Stage 2 AST modification: Connecting hooks across multiple modules
-2024-04-07 07:50:16,002 - INFO - --- Adding instance hooks for child module 'Or' of module 'Sample'
-2024-04-07 07:50:16,002 - INFO - -- Module 'Or' has only internal observe hooks - Assigning them to the module observe port
-2024-04-07 07:50:16,002 - INFO - -- Module 'Or' has only internal control hooks - Assigning them to the module control port
-2024-04-07 07:50:16,002 - INFO - -- Inserting primary observe port in module 'Or'
-2024-04-07 07:50:16,002 - INFO - -- Inserting primary control port in module 'Or'
-2024-04-07 07:50:16,002 - INFO - --- Adding instance hooks for child module 'Or' of module 'Sample'
-2024-04-07 07:50:16,003 - INFO - -- Module 'Sample' has both internal and instance-wise observe hooks - Concatenating them to the module observe port
-2024-04-07 07:50:16,003 - INFO - -- Module 'Sample' has both internal and instance-wise control hooks - Concatenating them to the module control port
-2024-04-07 07:50:16,003 - INFO - -- Inserting primary observe port in module 'Sample'
-2024-04-07 07:50:16,003 - INFO - -- Inserting primary control port in module 'Sample'
-2024-04-07 07:50:16,003 - INFO - Stage 2 AST modification complete
-2024-04-07 07:50:16,003 - INFO - Cross module patch hook insertion complete
-2024-04-07 07:50:16,003 - INFO - Generating modified verilog files...
-2024-04-07 07:50:16,022 - INFO - File write completed.
+2024-04-07 08:34:47,637 - INFO - Scanning AST of file - Sample.v for observable/controllable signals
+2024-04-07 08:34:47,637 - INFO - AST traversal complete: Observable/Controllable signals found in file - Sample.v
+2024-04-07 08:34:47,637 - INFO - Starting cross-module patch hook insertion.....
+2024-04-07 08:34:47,637 - INFO - Stage 1 AST modification: Inserting internal observe/control hooks in file - Sample.v
+2024-04-07 08:34:47,637 - INFO - Inserting control hooks in module - 'Sample'
+2024-04-07 08:34:47,637 - INFO - -- Bits [0:0] of Input port 'A' found as 'signal' controlled
+2024-04-07 08:34:47,637 - INFO - --- Bypassing load of 'A' via 'A_controlled' for SRU control
+2024-04-07 08:34:47,637 - INFO - -- Bits [0:0] of Output (wire) port 'out' found as 'signal' controlled
+2024-04-07 08:34:47,637 - INFO - --- Bypassing driver of 'out' via 'out_controlled' for SRU control
+2024-04-07 08:34:47,638 - INFO - -- Bits [0:0] of Output (wire) port 'out2' found as 'signal' controlled
+2024-04-07 08:34:47,638 - INFO - --- Bypassing driver of 'out2' via 'out2_controlled' for SRU control
+2024-04-07 08:34:47,638 - INFO - --Bits [0:0] of Output (reg) port 'out3' found as 'signal' controlled
+2024-04-07 08:34:47,638 - INFO - --- Bypassing driver of 'out3' via register 'out3_controlled' for SRU control
+2024-04-07 08:34:47,638 - INFO - --Bits [0:0] of Wire 'test_wire' found as 'signal' controlled
+2024-04-07 08:34:47,638 - INFO - --- Bypassing driver of 'test_wire' via wire 'test_wire_controlled' for SRU control
+2024-04-07 08:34:47,638 - INFO - --Bits [0:0] of Wire 'test_wire_2' found as 'signal' controlled
+2024-04-07 08:34:47,638 - INFO - --- Bypassing driver of 'test_wire_2' via wire 'test_wire_2_controlled' for SRU control
+2024-04-07 08:34:47,638 - INFO - Control hooks insertion in module 'Sample' complete
+2024-04-07 08:34:47,638 - INFO - Inserting observation hooks in module - 'Sample'
+2024-04-07 08:34:47,638 - INFO - Observed port 'A' also found to be a controlled input. Tapping in to 'A' for observation
+2024-04-07 08:34:47,638 - INFO - Observed port 'B' or 'B_controlled' doesn't exist in SRU LoadList, Tapping in to 'B' for observation
+2024-04-07 08:34:47,638 - INFO - Observed port 'out2' also found to be a controlled reg/wire/output. Tapping in to 'out2_controlled' for observation
+2024-04-07 08:34:47,638 - INFO - Observation hooks insertion in module 'Sample' complete
+2024-04-07 08:34:47,638 - INFO - Inserting control hooks in module - 'Or'
+2024-04-07 08:34:47,638 - INFO - --Bits [0:0] of Wire 'inter' found as 'signal' controlled
+2024-04-07 08:34:47,638 - INFO - --- Bypassing driver of 'inter' via wire 'inter_controlled' for SRU control
+2024-04-07 08:34:47,638 - INFO - Control hooks insertion in module 'Or' complete
+2024-04-07 08:34:47,638 - INFO - Inserting observation hooks in module - 'Or'
+2024-04-07 08:34:47,638 - INFO - Observed port 'inter' also found to be a controlled reg/wire/output. Tapping in to 'inter_controlled' for observation
+2024-04-07 08:34:47,638 - INFO - Observation hooks insertion in module 'Or' complete
+2024-04-07 08:34:47,638 - INFO - Stage 1 AST modification complete
+2024-04-07 08:34:47,638 - INFO - Stage 2 AST modification: Connecting cross-module observe/control hooks
+2024-04-07 08:34:47,638 - INFO - --- Adding instance hooks for child module instance 'inst1(Or)' of module 'Sample'
+2024-04-07 08:34:47,638 - INFO - -- Module 'Or' has only internal observe hooks - Assigning them to the module observe port
+2024-04-07 08:34:47,638 - INFO - -- Module 'Or' has only internal control hooks - Assigning them to the module control port
+2024-04-07 08:34:47,638 - INFO - -- Inserting primary observe port in module 'Or'
+2024-04-07 08:34:47,638 - INFO - -- Inserting primary control port in module 'Or'
+2024-04-07 08:34:47,638 - INFO - --- Adding instance hooks for child module instance 'inst2(Or)' of module 'Sample'
+2024-04-07 08:34:47,638 - INFO - -- Module 'Sample' has both internal and instance-wise observe hooks - Concatenating them to the module observe port
+2024-04-07 08:34:47,638 - INFO - -- Module 'Sample' has both internal and instance-wise control hooks - Concatenating them to the module control port
+2024-04-07 08:34:47,638 - INFO - -- Inserting primary observe port in module 'Sample'
+2024-04-07 08:34:47,638 - INFO - -- Inserting primary control port in module 'Sample'
+2024-04-07 08:34:47,638 - INFO - Stage 2 AST modification complete
+2024-04-07 08:34:47,638 - INFO - Cross module patch hook insertion complete
+2024-04-07 08:34:47,638 - INFO - Generating modified verilog files...
+2024-04-07 08:34:47,658 - INFO - File write completed.

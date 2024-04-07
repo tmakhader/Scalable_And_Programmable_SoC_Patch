@@ -15,7 +15,7 @@ fileHandler = logging.FileHandler('verilog_parse.log', mode='w')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fileHandler.setFormatter(formatter)
 logging.getLogger().addHandler(fileHandler)
-logging.info("Started Automatic, Scalable And Programmable (ASAP) tool for Hardware Patching...\n\n " + pyfiglet.figlet_format("ASAP  PATCH "))
+logging.info("Started Automatic, Scalable And Programmable (ASAP) tool for Hardware Patching...\n\n " + pyfiglet.figlet_format("ASAP  PATCH"))
 #--------------------------------------------------------------------------------------------------#
 
 # Exception class for pragma parsing
@@ -129,7 +129,6 @@ class InstantiationTree:
         self.moduleToAst = moduleToAst
         self.instanceTree = self.populateTree(moduleToAst[topModule], \
                           isTopModule=True)
-        logging.info("Instantiation tree generated - ")
 
     # Method used to recursively populate the instantiation tree
     def populateTree(self, ast, isTopModule = False):
@@ -335,7 +334,7 @@ class VerilogGenerator(LogStructuring):
             # If the observed signal of the counterPart is not in SRU driver list,
             # it is not controlled and we can safely observe the original signal
             else:
-                logging.info("Observed port '%s' or %s doesn't exist in SRU LoadList, Tapping in to '%s' for observation" %(signal,  \
+                logging.info("Observed port '%s' or '%s' doesn't exist in SRU LoadList, Tapping in to '%s' for observation" %(signal,  \
                                                                                                      self.signalCounterPart(signal), \
                                                                                                                             signal))
                 signalRangeLhs = signalToObserve[signal][0]
@@ -446,7 +445,7 @@ class VerilogGenerator(LogStructuring):
             if isinstance(port.second, Wire) and isinstance(port.first, Input):
                 newPorts.append(port)
                 if port.first.name in signalToControl:
-                    logging.info("-- Bits [%s:%s] of Input port %s found as %s controlled"%(signalToControl[port.first.name][1],  \
+                    logging.info("-- Bits [%s:%s] of Input port '%s' found as '%s' controlled"%(signalToControl[port.first.name][1],  \
                                                                                             signalToControl[port.first.name][2],  \
                                                                                             port.first.name,                      \
                                                                                             signalToControl[port.first.name][0]))
@@ -479,7 +478,7 @@ class VerilogGenerator(LogStructuring):
             elif isinstance(port.second, Wire) and isinstance(port.first, Output):
                 newPorts.append(port)
                 if port.first.name in signalToControl:
-                    logging.info("-- Bits [%s:%s] of Output (wire) port %s found as %s controlled"%(signalToControl[port.first.name][1], \
+                    logging.info("-- Bits [%s:%s] of Output (wire) port '%s' found as '%s' controlled"%(signalToControl[port.first.name][1], \
                                                                                                     signalToControl[port.first.name][2], \
                                                                                                     port.first.name,                     \
                                                                                                     signalToControl[port.first.name][0]))
@@ -511,7 +510,7 @@ class VerilogGenerator(LogStructuring):
             # -- Change all drivers of A to A_controlled 
             elif isinstance(port.second, Reg) and isinstance(port.first, Output):
                 if port.first.name in signalToControl:
-                    logging.info("--Bits [%s:%s] of Output (reg) port %s found as %s controlled"%(signalToControl[port.first.name][1], \
+                    logging.info("--Bits [%s:%s] of Output (reg) port '%s' found as '%s' controlled"%(signalToControl[port.first.name][1], \
                                                                                                   signalToControl[port.first.name][2], \
                                                                                                   port.first.name,                     \
                                                                                                   signalToControl[port.first.name][0]))
@@ -566,7 +565,7 @@ class VerilogGenerator(LogStructuring):
                 if isinstance(item.list[0], Reg):   # NOTE: item.list is a tuple
                     regDecl = item.list[0]
                     if regDecl.name in signalToControl:
-                        logging.info("--Bits [%s:%s] of Register %s found as %s controlled"%(signalToControl[regDecl.name][1], \
+                        logging.info("--Bits [%s:%s] of Register '%s' found as '%s' controlled"%(signalToControl[regDecl.name][1], \
                                                                                            signalToControl[regDecl.name][2],   \
                                                                                            regDecl.name,                       \
                                                                                            signalToControl[regDecl.name][0]))
@@ -607,11 +606,11 @@ class VerilogGenerator(LogStructuring):
                 elif isinstance(item.list[0], Wire):
                     wireDecl = item.list[0]
                     if wireDecl.name in signalToControl:
-                        logging.info("--Bits [%s:%s] of Wire %s found as %s controlled"%(signalToControl[wireDecl.name][1], \
+                        logging.info("--Bits [%s:%s] of Wire '%s' found as '%s' controlled"%(signalToControl[wireDecl.name][1], \
                                                                                          signalToControl[wireDecl.name][2], \
                                                                                          wireDecl.name,                     \
                                                                                          signalToControl[wireDecl.name][0]))
-                        logging.info("--- Bypassing driver of '%s' via register '%s' for SRU control"%(wireDecl.name,       \
+                        logging.info("--- Bypassing driver of '%s' via wire '%s' for SRU control"%(wireDecl.name,       \
                                                                                                        wireDecl.name + "_controlled"))
                         # Making a Declaration node passed with list (tuple) of the new wire - A_controlled
                         newWire = Decl((Wire(name = wireDecl.name + "_controlled",  \
@@ -731,7 +730,8 @@ class VerilogGenerator(LogStructuring):
             if childModules is not None:  # Check if this is not a leaf module
                 # Non-leaf module operations
                 for childModule in childModules:
-                    logging.info("--- Adding instance hooks for child module '%s' of module '%s'" %(childModule[1], moduleNode[1]))
+                    logging.info("--- Adding instance hooks for child module instance '%s(%s)' of module '%s'" %(childModule[0], childModule[1], \
+                                                                                                                 moduleNode[1]))
                     # Recurse through child instances before hooking up ports (only if it has not been traversed before
                     # no prevent duplicate hooks)
                     # This would update the controlPortWidth and observePortWidth 
@@ -821,7 +821,7 @@ class VerilogGenerator(LogStructuring):
                 rhs = Concat([concatWireOne, concatWireTwo])
                 items.append(Assign(lhs, rhs))
                 # Declare wire <controlPortOut_inst>
-                items.insert(0, Decl((Wire(self.controlPortOut + "inst", width = controlPortInstWidth),)))
+                items.insert(0, Decl((Wire(self.controlPortOut + "_inst", width = controlPortInstWidth),)))
                 # Add assignment assign {<controlPortOut>_int, <controlPortOut>_inst} = <controlPortOut>
                 concatWireOne = Identifier(self.controlPortOut + "_int")
                 concatWireTwo = Identifier(self.controlPortOut + "_inst")
@@ -911,7 +911,7 @@ class VerilogGenerator(LogStructuring):
             moduleToControlWidth.update(moduleToControlWidthPerFile)
 
         # STAGE - 2 (Inter module hook insertion)   
-        logging.info("Stage 2 AST modification: Connecting hooks across multiple modules")
+        logging.info("Stage 2 AST modification: Connecting cross-module observe/control hooks")
         self.stageTwoFileModifier(moduleToObserveWidth, \
                                   moduleToControlWidth)
         logging.info("Stage 2 AST modification complete")

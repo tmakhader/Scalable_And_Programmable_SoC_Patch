@@ -13,7 +13,7 @@ module Sample
   input [7:0] control_port_out
 );
 
-  wire [1:0] control_port_outinst;
+  wire [1:0] control_port_out_inst;
   wire [1:0] control_port_in_inst;
   wire [1:0] observe_port_inst;
   wire [2:0] observe_port_int;
