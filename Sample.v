@@ -1,5 +1,5 @@
 module Sample(
-    input wire A,    
+    input wire A,    // #pragma observe 0:0 control signal 0:0 
     input wire B,    // #pragma observe 0:0
     input wire clk,
     output wire out, // #pragma control signal 0:0
@@ -7,11 +7,24 @@ module Sample(
     output reg  out3 // #pragma control signal 0:0
 );
     wire test_wire; // #pragma control signal 0:0
+    wire test_wire_2; // #pragma control signal 0:0
     assign out = A&B; 
-    assign test_wire = ~out;
-    assign out2 = test_wire|B|out3; 
+
+    Or inst (.in(A),
+             .out(test_wire));
+
+    Or inst (.in(B),
+             .out(test_wire_2));
+
+    assign out2 = test_wire|B|out3|test_wire_2; 
     always @(posedge clk) begin
       out3 <= A;
     end
-    
+endmodule
+
+module Or(
+    input in,
+    output out
+);
+    assign out = ~in;
 endmodule

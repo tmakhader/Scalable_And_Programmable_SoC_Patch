@@ -15,7 +15,7 @@ fileHandler = logging.FileHandler('verilog_parse.log', mode='w')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fileHandler.setFormatter(formatter)
 logging.getLogger().addHandler(fileHandler)
-logging.info("Started Automatic, Scalable And Programmable (ASAP) tool for Hardware Patching...\n\n " + pyfiglet.figlet_format("ASAP  PATCH"))
+logging.info("Started Automatic, Scalable And Programmable (ASAP) tool for Hardware Patching...\n\n " + pyfiglet.figlet_format("ASAP  PATCH "))
 #--------------------------------------------------------------------------------------------------#
 
 # Exception class for pragma parsing
@@ -40,6 +40,16 @@ class LogStructuring:
         for value in list:
             listData += "%s\n"%(value)    
         return listData
+
+    def logTreeInfo(self, tree, initialString = "\n", indent=0):
+        for key, value in tree.items():
+            initialString += ("  " * indent + str(key))
+            if isinstance(value, dict):
+                initialString = self.logTreeInfo(value, indent + 1, initialString)
+            else:
+                initialString += ("  " * (indent + 1) + str(value))
+        return initialString
+        
 
 
 # Class to process filelist and extract pragmas and associated properties
@@ -111,20 +121,59 @@ class PragmaExtractor(LogStructuring):
         return {file: self.fileParser(file) for file in files}
 
 
-# Class to populate a map {file: {signal:{observe:None/[start, end],
-#                                         control:None/[type, start, end]}}}
+# Class to identify module instantiation hierarchy to perform various insertion operations
+# The class expects top-module and a hash map of module to AST for tree population
+class InstantiationTree:
+    def __init__(self, topModule, moduleToAst):
+        self.topModule = topModule
+        self.instanceTree = {}
+        self.moduleToAst = moduleToAst
+        self.populateTree(moduleToAst[topModule], \
+                          isTopModule=True)
+        logging.info("Instantiation tree generated - \n")
+
+    # Method used to recursively populate the instantiation tree
+    def populateTree(self, ast, isTopModule = False):
+        if isTopModule:
+            self.instanceTree.update({("TOP", self.topModule):
+                                      self.populateTree(ast)})
+        for item in ast.items:
+            if isinstance(item, InstanceList):
+                for instance in item.instances:
+                    self.instanceTree.update({(instance.name, instance.module): \
+                                              self.populateTree(self.moduleToAst[instance.module])})
+        return None
+                    
+
+# Class to parse the filelist
 class VerilogParser(LogStructuring):
-    def __init__(self, filelist) -> None:
+    def __init__(self, filelist, topModule) -> None:
         super().__init__()  # LogStructuring constructor
-        self.filelist = filelist
-        self.pragmaExtractor = PragmaExtractor(self.filelist)
+        self.filelist        = filelist
         logging.info("Parser initialized with %s"%(self.filelist))
+        self.pragmaExtractor = PragmaExtractor(self.filelist)
+        self.fileToPragma    = self.pragmaExtractor.filelistParse()
+        self.fileToAst       = self.fileWiseAst()
+        logging.info("File to AST hash map generated")
+        self.moduleToAst     = self.moduleWiseAst()
+        logging.info("Module to AST hash map generated")
+        self.tree            = InstantiationTree(topModule, self.moduleToAst).instanceTree
+        logging.info("Instantiation tree generated \n %s"%(self.logTreeInfo(self.tree)))
+
+    def moduleWiseAst(self):
+        moduleToAst = {}
+        for file in self.fileToAst:
+            ast = self.fileToAst[file]
+            definitions = ast.description.definitions
+            for definition in definitions:
+                if isinstance(definition, ModuleDef):
+                    moduleToAst.update({definition.name:definition})
+        return moduleToAst
 
     # Source file to AST hash map
     def fileWiseAst(self):
         assert os.path.exists(self.filelist), "Filelist %s doesn't exist"%(self.filelist)
         files = [filename.strip() for filename in open(self.filelist, 'r') if filename.strip()]
-        print (files)
         assert all(os.path.exists(file) for file in files), "Not all files in the filelist are valid"
         fileToAst = {file: VerilogCodeParser([file]).parse() for file in files}
         if all(value is not None for value in fileToAst.values()):
@@ -171,51 +220,63 @@ class VerilogParser(LogStructuring):
         return 
 
     # For a given file, performs AST traversal on all modules to extract
-    # signalToObserve - {<SIGNAL>:(START_INDEX, END_INDEX)}
-    # signalToControl - {<SIGNAL>:(CONTROL_TYPE, START_INDEX, END_INDEX)}
+    # signalToObserve - {<MODULE> : {<SIGNAL>:(START_INDEX, END_INDEX)}}
+    # signalToControl - {<MODULE> : {<SIGNAL>:(CONTROL_TYPE, START_INDEX, END_INDEX)}}
     def signalToPragma(self, ast, lineToPragma):
         moduleDefs = ast.description.definitions
-        signalToControl = {}
-        signalToObserve = {}
+        moduleToSignalToControl = {}
+        moduleToSignalToObserve = {}
         for moduleDef in moduleDefs:
             if isinstance(moduleDef, ModuleDef):
-                self.traverseAst(moduleDef, lineToPragma, signalToControl, signalToObserve)
-        return signalToObserve, signalToControl
-
-
+                signalToControlPerModule = {}
+                signalToObservePerModule = {}
+                self.traverseAst(moduleDef,                 \
+                                 lineToPragma,              \
+                                 signalToControlPerModule,  \
+                                 signalToObservePerModule)
+                moduleToSignalToControl.update({moduleDef.name:signalToControlPerModule})
+                moduleToSignalToObserve.update({moduleDef.name:signalToObservePerModule})
+        return moduleToSignalToObserve, moduleToSignalToControl
 
     # For all files in the file list creates the following hash maps:
-    # Observability Map:   {<FILE>:{<SIGNAL>:(START_INDEX, END_INDEX)}} 
-    # Controllability Map: {<FILE>:{<SIGNAL>:(CONTROL_TYPE, START_INDEX, END_INDEX)}} 
-    def fileToSignalToPragma(self):
-        fileToAst    = self.fileWiseAst()
-        fileToPragma = self.pragmaExtractor.filelistParse()
-        fileToSignalToControl = {}
-        fileToSignalToObserve = {}
+    # Observability Map:   {<FILE>:{<MODULE>:{<SIGNAL>:(START_INDEX, END_INDEX)}}} 
+    # Controllability Map: {<FILE>:{<MODULE>:{<SIGNAL>:(CONTROL_TYPE, START_INDEX, END_INDEX)}}} 
+    def fileToModuleToSignalToPragma(self):
+        fileToModuleToSignalToControl = {}
+        fileToModuleToSignalToObserve = {}
 
         # For all files populates signals and appropriate observe/control properties
-        for file in fileToAst:
+        for file in self.fileToAst:
             logging.info("Scanning AST of file - %s for observable/controllable signals"%(file))
-            signalToObserve, signalToControl = self.signalToPragma(fileToAst[file], fileToPragma[file])
-            if bool(signalToObserve) | bool(signalToControl):
+            moduleToSignalToObserve, moduleToSignalToControl = self.signalToPragma(self.fileToAst[file], self.fileToPragma[file])
+            if bool(moduleToSignalToObserve) | bool(moduleToSignalToControl):
                 logging.info("AST traversal complete: Observable/Controllable signals found in file - %s"%(str(file)))
             else:
                 logging.warning("AST traversal complete: No observable or controllable signals found in file - %s"%(str(file)))
-            fileToSignalToObserve.update({file:signalToObserve})
-            fileToSignalToControl.update({file:signalToControl})
-        return fileToSignalToObserve, fileToSignalToControl
+            fileToModuleToSignalToObserve.update({file:moduleToSignalToObserve})
+            fileToModuleToSignalToControl.update({file:moduleToSignalToControl})
+        return fileToModuleToSignalToObserve, fileToModuleToSignalToControl
 
 
 
 # Class to generate modified verilog code based on added pragmas
 class VerilogGenerator(LogStructuring):
-    def __init__(self, filewiseAst, fileToSignalToObserve, fileToSignalToControl, observePort, controlPortIn, controlPortOut) -> None:
-        self.filewiseAst = filewiseAst
-        self.fileToSignalToObserve = fileToSignalToObserve
-        self.fileToSignalToControl = fileToSignalToControl
-        self.observePort = observePort
-        self.controlPortIn = controlPortIn
-        self.controlPortOut = controlPortOut
+    def __init__(self, filewiseAst, 
+                       instanceTree, 
+                       topModule,
+                       fileToModuleToSignalToObserve,  
+                       fileToModuleToSignalToControl,  
+                       observePort, 
+                       controlPortIn, 
+                       controlPortOut) -> None:
+        self.filewiseAst           = filewiseAst
+        self.fileToModuleToSignalToObserve = fileToModuleToSignalToObserve
+        self.fileToModuleToSignalToControl = fileToModuleToSignalToControl
+        self.observePort           = observePort
+        self.controlPortIn         = controlPortIn
+        self.controlPortOut        = controlPortOut
+        self.instanceTree          = instanceTree
+        self.topModule             = topModule
     
     # Create necessary tap (assignment )logic for observe signals to propagate to SMU
     #                         <Observation of controlled signals>
@@ -228,45 +289,45 @@ class VerilogGenerator(LogStructuring):
     #                      |
     #                  ObservePort
     #                (SMU Observe Tap)   
-    def createObserveTaps(self, signalToObserve, sruDriverList):
+    def createInternalObserveTaps(self, signalToObserve, sruDriverList):
         assignmentList = []
-        observePortIndexLast = 0
+        observePortIndexLastInt = 0
         for signal in signalToObserve:
             # If the observed signal is in SRU driver list:
-            # -- assign <observePort[<range>]> = <signal[OBSERVE_START:OBSERVE_END]> 
+            # -- assign <observePortInt[<range>]> = <signal[OBSERVE_START:OBSERVE_END]> 
             if any(signal == controlSignal[0] for controlSignal in sruDriverList):
                 logging.info("Observed port '%s' also found to be a controlled input. Tapping in to '%s' for observation" %(signal, \
                                                                                                                             signal))
                 signalRangeLhs = signalToObserve[signal][0]
                 signalRangeRhs = signalToObserve[signal][1]
-                observePortRangeLhs = observePortIndexLast + (signalRangeRhs - signalRangeLhs)
-                observePortRangeRhs = observePortIndexLast
-                Lhs = Partselect(Identifier(self.observePort),  \
+                observePortRangeLhs = observePortIndexLastInt + (signalRangeRhs - signalRangeLhs)
+                observePortRangeRhs = observePortIndexLastInt
+                Lhs = Partselect(Identifier(self.observePort + "_int"),  \
                                 IntConst(observePortRangeLhs), \
                                 IntConst(observePortRangeRhs))
                 Rhs = Partselect(Identifier(signal),  \
                                 IntConst(signalRangeLhs), \
                                 IntConst(signalRangeRhs))
                 assignmentList.append(Assign(Lhs, Rhs))
-                observePortIndexLast = observePortRangeLhs + 1
+                observePortIndexLastInt = observePortRangeLhs + 1
             # If the counter part (+/- "_controlled") of observed signal is in SRU sriver list as well,
             # -- we should observe this as the original observed signal would be the patched version
-            # -- assign <observePort[<range>]> = <couterPart(signal)[OBSERVE_START:OBSERVE_END]> 
+            # -- assign <observePortInt[<range>]> = <couterPart(signal)[OBSERVE_START:OBSERVE_END]> 
             elif any(self.signalCounterPart(signal) == controlSignal[0] for controlSignal in sruDriverList):
                 logging.info("Observed port '%s' also found to be a controlled reg/wire/output. Tapping in to '%s' for observation" %(signal,  \
                                                                                                                self.signalCounterPart(signal)))
                 signalRangeLhs = signalToObserve[signal][0]
                 signalRangeRhs = signalToObserve[signal][1]
-                observePortRangeLhs = observePortIndexLast + (signalRangeRhs - signalRangeLhs)
-                observePortRangeRhs = observePortIndexLast
-                Lhs = Partselect(Identifier(self.observePort),  \
+                observePortRangeLhs = observePortIndexLastInt + (signalRangeRhs - signalRangeLhs)
+                observePortRangeRhs = observePortIndexLastInt
+                Lhs = Partselect(Identifier(self.observePort + "_int"),  \
                                 IntConst(observePortRangeLhs), \
                                 IntConst(observePortRangeRhs))
                 Rhs = Partselect(Identifier(self.signalCounterPart(signal)),  \
                                 IntConst(signalRangeLhs), \
                                 IntConst(signalRangeRhs))
                 assignmentList.append(Assign(Lhs, Rhs))
-                observePortIndexLast = observePortRangeLhs + 1
+                observePortIndexLastInt = observePortIndexLastInt + 1
             # If the observed signal of the counterPart is not in SRU driver list,
             # it is not controlled and we can safely observe the original signal
             else:
@@ -275,17 +336,17 @@ class VerilogGenerator(LogStructuring):
                                                                                                                             signal))
                 signalRangeLhs = signalToObserve[signal][0]
                 signalRangeRhs = signalToObserve[signal][1]
-                observePortRangeLhs = observePortIndexLast + (signalRangeRhs - signalRangeLhs)
-                observePortRangeRhs = observePortIndexLast
-                Lhs = Partselect(Identifier(self.observePort),  \
+                observePortRangeLhs = observePortIndexLastInt + (signalRangeRhs - signalRangeLhs)
+                observePortRangeRhs = observePortIndexLastInt
+                Lhs = Partselect(Identifier(self.observePort + "_int"),  \
                                 IntConst(observePortRangeLhs), \
                                 IntConst(observePortRangeRhs))
                 Rhs = Partselect(Identifier(signal),  \
                                 IntConst(signalRangeLhs), \
                                 IntConst(signalRangeRhs))
                 assignmentList.append(Assign(Lhs, Rhs))
-                observePortIndexLast = observePortRangeLhs + 1
-        return assignmentList, observePortIndexLast - 1
+                observePortIndexLastInt = observePortIndexLastInt + 1
+        return assignmentList, observePortIndexLastInt - 1
     
     def signalCounterPart(self, signal):
         if "controlled" in signal:
@@ -299,42 +360,42 @@ class VerilogGenerator(LogStructuring):
     # signal 1 ---|      (SRU Input Tap)     |        |     (SRU Output Tap)  | --- signal' 1
     # signal 2 ---|------ controlPortIn- ----|  SRU   |------ControlPortOut---| --- signal' 2
     # ,,,,,,,, ---|                          |________|                       | --- ,,,,,,,,,
-    def createControlTaps(self, sruDriverList, sruLoadList):
+    def createInternalControlTaps(self, sruDriverList, sruLoadList):
         assignmentList = []
-        controlPortInIndexLast = 0
-        controlPortOutIndexLast = 0
-        # Input tap assignment - assign <controlPortIn[range]]> = <signal[START:END]>;
+        controlPortInIndexLastInt  = 0
+        controlPortOutIndexLastInt = 0
+        # Internal input tap assignment - assign <controlPortInInt[range]]> = <signal[START:END]>;
         for signalNode in sruDriverList:
             signalRangeLhs = signalNode[1]
             signalRangeRhs = signalNode[2]
-            controlPortRangeLhs = controlPortInIndexLast + (signalRangeRhs - signalRangeLhs)
-            controlPortRangeRhs = controlPortInIndexLast
-            Lhs = Partselect(Identifier(self.controlPortIn), \
-                            IntConst(controlPortRangeLhs),   \
+            controlPortRangeLhs = controlPortInIndexLastInt + (signalRangeRhs - signalRangeLhs)
+            controlPortRangeRhs = controlPortInIndexLastInt
+            Lhs = Partselect(Identifier(self.controlPortIn + "_int"), \
+                            IntConst(controlPortRangeLhs),            \
                             IntConst(controlPortRangeRhs))
-            Rhs = Partselect(Identifier(signalNode[0]),      \
-                            IntConst(signalRangeLhs),        \
+            Rhs = Partselect(Identifier(signalNode[0]),               \
+                            IntConst(signalRangeLhs),                 \
                             IntConst(signalRangeRhs))
             assignmentList.append(Assign(Lhs, Rhs))
-            controlPortInIndexLast = controlPortRangeLhs + 1
+            controlPortInIndexLastInt = controlPortInIndexLastInt + 1
 
-        # Output tap assignment - assign <signal'[START:END]> = <controlPortIn[range]]>
-        # FIXME (Not implemented) assign <signal'[rest]> = <signal[rest]>
+        # Internal output tap assignment - assign <signal'[START:END]> = <controlPortOutInt[range]]>
+        # FIXME (Not implemented)          assign <signal'[rest]> = <signal[rest]>
         for signalNode in sruLoadList:
             signalRangeLhs = signalNode[1]
             signalRangeRhs = signalNode[2]
-            controlPortRangeLhs = controlPortOutIndexLast + (signalRangeRhs - signalRangeLhs)
-            controlPortRangeRhs = controlPortOutIndexLast
-            Lhs = Partselect(Identifier(signalNode[0]),  \
-                            IntConst(signalRangeLhs),             \
+            controlPortRangeLhs = controlPortOutIndexLastInt + (signalRangeRhs - signalRangeLhs)
+            controlPortRangeRhs = controlPortOutIndexLastInt
+            Lhs = Partselect(Identifier(signalNode[0]),                    \
+                            IntConst(signalRangeLhs),                      \
                             IntConst(signalRangeRhs))
-            Rhs = Partselect(Identifier(self.controlPortOut),     \
-                            IntConst(controlPortRangeLhs),        \
+            Rhs = Partselect(Identifier(self.controlPortOut + "_int"),     \
+                            IntConst(controlPortRangeLhs),                 \
                             IntConst(controlPortRangeRhs))
             assignmentList.append(Assign(Lhs, Rhs))
-            controlPortOutIndexLast = controlPortOutIndexLast + 1
+            controlPortOutIndexLastInt = controlPortOutIndexLastInt + 1
 
-        return assignmentList, controlPortInIndexLast - 1, controlPortOutIndexLast - 1
+        return assignmentList, controlPortInIndexLastInt - 1, controlPortOutIndexLastInt - 1
     
     # This method recursively traverses the AST to modify all drivers of a signal
     def traverseAstToModifyLHS(self, astNode, signal):
@@ -577,84 +638,294 @@ class VerilogGenerator(LogStructuring):
         return sruDriverList, sruLoadList
 
 
-    def addLogicForControl(self, moduleNode, signalToControl):
+    def addModuleWiseLogicForControl(self, moduleNode, signalToControl):
         sruDriverListIo, sruLoadListIo   = self.ModifyControlledIOPorts(moduleNode, signalToControl)
         sruDriverListDec, sruLoadListDec = self.ModifyControlledRegAndWires(moduleNode, signalToControl)
 
-        assignmentList, controlPortInIndexLast, controlPortOutIndexLast = self.createControlTaps((sruDriverListIo + sruDriverListDec),
-                                                                                                 (sruLoadListIo + sruLoadListDec))
+        assignmentList, controlPortInIndexLastInt, controlPortOutIndexLastInt = self.createInternalControlTaps((sruDriverListIo + sruDriverListDec),
+                                                                                                      (sruLoadListIo + sruLoadListDec))
         # Adding Control port input and output
-        controlPortInWidth  =  Width(msb=IntConst(controlPortInIndexLast), lsb=IntConst(0))
-        controlPortOutWidth =  Width(msb=IntConst(controlPortOutIndexLast), lsb=IntConst(0))
-        controlPortOutput   = Ioport(Output(self.controlPortIn, width=controlPortInWidth))
-        controlPortInput    = Ioport(Input(self.controlPortOut, width=controlPortOutWidth))
-        amendedPort = list(moduleNode.portlist.ports)
-        amendedPort.extend([controlPortInput, controlPortOutput])
-        moduleNode.portlist.ports = tuple(amendedPort)
-        items_list = list(moduleNode.items)
-        for assignment in assignmentList:
-            items_list.append(assignment)
-        moduleNode.items = tuple(items_list)
-        return sruDriverListIo + sruDriverListDec
+        if controlPortInIndexLastInt >= 0:
+            controlPortInWidthInt  =  Width(msb=IntConst(controlPortInIndexLastInt),  lsb=IntConst(0))
+            controlPortOutWidthInt =  Width(msb=IntConst(controlPortOutIndexLastInt), lsb=IntConst(0))
+            controlPortWireInInt   = Decl((Wire(self.controlPortIn  + "_int", width = controlPortInWidthInt),))
+            controlPortWireOutInt  = Decl((Wire(self.controlPortOut + "_int", width = controlPortOutWidthInt),))
+            itemsList = list(moduleNode.items)
+            itemsList.insert(0, controlPortWireInInt)
+            itemsList.insert(1, controlPortWireOutInt)
+            for assignment in assignmentList:
+                itemsList.append(assignment)
+            moduleNode.items = tuple(itemsList)
+        return sruDriverListIo + sruDriverListDec, controlPortInIndexLastInt + 1
 
 
     # This method modifies the module AST node to add observe ports and assignments
-    def addLogicForObservation(self, moduleNode, signalToObserve, sruDriverList):
-        assignmentList, observePortIndexLast = self.createObserveTaps(signalToObserve, sruDriverList)
-        outputWidth = Width(msb=IntConst(observePortIndexLast), lsb=IntConst(0))
-        observePortOutput = Ioport(Output(self.observePort, width=outputWidth))
-        amendedPort = list(moduleNode.portlist.ports)
-        amendedPort.append(observePortOutput)
-        moduleNode.portlist.ports = tuple(amendedPort)
-        items_list = list(moduleNode.items)
-        for assignment in assignmentList:
-            items_list.append(assignment)
-        moduleNode.items = tuple(items_list)
+    def addModuleWiseLogicForObservation(self, moduleNode, signalToObserve, sruDriverList):
+        assignmentList, observePortIndexLastInt = self.createInternalObserveTaps(signalToObserve, sruDriverList)
+        if observePortIndexLastInt  >= 0:
+            observePortIntWidth = Width(msb=IntConst(observePortIndexLastInt), lsb=IntConst(0))
+            observePortWireInt = Decl((Wire(self.observePort + "_int", width = observePortIntWidth),))
+            items_list = list(moduleNode.items)
+            items_list.insert(0, observePortWireInt)
+            for assignment in assignmentList:
+                items_list.append(assignment)
+            moduleNode.items = tuple(items_list)
+        return observePortIndexLastInt + 1
     
-    # This method does module-wise code insertion in a file
-    def fileModifier(self, file, signalToObserve, signalToControl):
+    # This method does module-wise observe/control hooks for per-module signals
+    def stageOneFileModifier(self, file, moduleToSignalToObserve, moduleToSignalToControl):
         ast = self.filewiseAst[file]
+        moduleToControlWidth = {}
+        moduleToObserveWidth = {}
         moduleDefs = ast.description.definitions
         for moduleDef in moduleDefs:
             if isinstance(moduleDef, ModuleDef):
                 logging.info("Inserting control hooks in module - '%s'" %(moduleDef.name))
-                sruDriverList = self.addLogicForControl(moduleDef, signalToControl)
+                sruDriverList, ControlWidth = self.addModuleWiseLogicForControl(moduleDef, moduleToSignalToControl[moduleDef.name])
+                moduleToControlWidth.update({moduleDef.name:ControlWidth})
                 logging.info("Control hooks insertion in module '%s' complete"%(moduleDef.name))
                 logging.info("Inserting observation hooks in module - '%s'"%(moduleDef.name))
-                self.addLogicForObservation(moduleDef, signalToObserve, sruDriverList)
+                observeWidth = self.addModuleWiseLogicForObservation(moduleDef, moduleToSignalToObserve[moduleDef.name], sruDriverList)
+                moduleToObserveWidth.update({moduleDef.name:observeWidth})
                 logging.info("Observation hooks insertion in module '%s' complete"%(moduleDef.name))
+        return moduleToObserveWidth, moduleToControlWidth
     
-    # This method generates new verilog code for a file
-    def genModifiedVerilogFile(self, file, signalToObserve, signalToControl):
+    # Returns AST for a module (if it exists): Else returns None
+    def getAstForModule(self, moduleName):
+        for file in self.fileToModuleToSignalToObserve:
+            ast = self.filewiseAst[file]
+            for definition in ast.description.definitions:
+                if isinstance(definition, ModuleDef):
+                    if definition.name == moduleName:
+                        return definition
+        return None
+    
+    # Recursive method to insert control/observe hooks in the instantiation hierarchy
+    # Sample Instance Tree - {(TOP, Sample):{(inst1, Or):None, (inst2, And):None}}
+    #            (TOP, Sample)     
+    #                 /\
+    #                /  \
+    #      (inst1, Or)  (inst2, And)
+    #               |    |
+    #               |    |
+    #            None    None
+    # In the above tree, top-module Sample has an instance each of Or and And modules, which are leaf instances
+    # Node with value - None indicates a leaf module
+    def insertInterModuleHooks(self, moduleNode, treeNode, 
+                                                 moduleToObserveWidth,  \
+                                                 moduleToControlWidth,  \
+                                                 controlPortWidth = 0,  \
+                                                 observePortWidth = 0):   
+        if moduleNode is not None:
+            # The moduleNode is the current module being processed
+            # The value of treeNode[moduleNode] are the instances of other modules within that module
+            childModules = treeNode[moduleNode]
+            # Tracker for width of observe/control ports hooked up in each instance within the module
+            controlPortInstIndex = 0
+            observePortInstIndex = 0
+            # Get the AST for the current module being processed
+            items = list(self.getAstForModule(moduleNode[1]).items)
+            ports = list(self.getAstForModule(moduleNode[1]).portlist.ports)
+            if childModules is not None:  # Check if this is not a leaf module
+                # Non-leaf module operations
+                for childModule in childModules:
+                    # Recurse through child instances before hooking up ports
+                    # This would update the controlPortWidth and observePortWidth 
+                    self.insertInterModuleHooks(self, childModule, {childModule: treeNode[moduleNode][childModule]},     \
+                                                                    moduleToObserveWidth, \
+                                                                    moduleToControlWidth, \
+                                                                    controlPortWidth,     \
+                                                                    observePortWidth )
+                    for item in items:
+                        if isinstance(item, InstanceList):
+                            instances = item.instances
+                            for instance in instances:
+                                if isinstance(instance, Instance):
+                                    if instance.name == childModule[0] and observePortWidth > 0:
+                                        # Port-Mapping for observe port
+                                        lhs = Identifier(self.observePort)
+                                        Rhs = Partselect(Identifier(self.observePort + "_inst"),                         \
+                                                         msb = IntConst(observePortInstIndex + observePortWidth - 1),    \
+                                                         lsb = IntConst(observePortInstIndex))
+                                        instance.portlist.ports.append(PortArg(lhs,Rhs))
+                                        observePortInstIndex += observePortWidth
+                                    if instance.name == childModule[0] and controlPortWidth > 0:
+                                        # Port-Mapping for ControlIn port
+                                        lhs = Identifier(self.controlPortIn)
+                                        Rhs = Partselect(Identifier(self.controlPortIn + "_inst"),                       \
+                                                         msb = IntConst(controlPortInstIndex + controlPortWidth - 1),    \
+                                                         lsb = IntConst(controlPortInstIndex))
+                                        instance.portlist.ports.append(PortArg(lhs,Rhs))
+                                        # Port-Mapping for ControlOut port
+                                        lhs = Identifier(self.controlPortOut)
+                                        Rhs = Partselect(Identifier(self.controlPortOut + "_inst"),       \
+                                                         msb = IntConst(controlPortInstIndex + controlPortWidth - 1),    \
+                                                         lsb = IntConst(controlPortInstIndex))
+                                        instance.portlist.ports.append(PortArg(lhs,Rhs))
+                                        controlPortInstIndex += controlPortWidth
+                                        
+                                        instance.portlist.ports.append()
+            # The mmodule has both internal and instance-wise observe ports
+            if observePortInstIndex > 0 and moduleToObserveWidth[moduleNode[1]] > 0:
+                # Declare <observePort>_inst wire
+                observePortInstWidth = Width(msb = IntConst(observePortInstIndex - 1), lsb = IntConst(0))
+                items.insert(0, Decl((Wire(self.observePort + "_inst", width = observePortInstWidth)),))
+                # Add assignment: assign <observePort> = {<obervePort>_int, <observePort>_inst}
+                lhs = Identifier(self.observePort)
+                concatWireOne = Identifier(self.observePort + "_int")
+                concatWireTwo = Identifier(self.observePort + "_inst")
+                rhs = Concat([concatWireOne, concatWireTwo])
+                items.append(Assign(lhs, rhs))
+            # The module has instance-wise but no internal observe ports
+            elif observePortInstIndex > 0 and moduleToObserveWidth[moduleNode[1]] == 0:
+                # Declare <observePort>_inst wire
+                observePortInstWidth = Width(msb = IntConst(observePortInstIndex - 1), lsb = IntConst(0))
+                items.insert(0, Decl((Wire(self.observePort + "_inst", width = observePortInstWidth)),))
+                # Add assignment: assign <observePort> = <observePort>_inst
+                lhs = Identifier(self.observePort)
+                rhs = Identifier(self.observePort + "_inst")
+                items.append(Assign(lhs, rhs))
+            # The module has internal but no instance-wise observe ports
+            elif observePortInstIndex == 0 and moduleToObserveWidth[moduleNode[1]] > 0:
+                # Add assignment: assign <observePort> = <observePort>_int
+                lhs = Identifier(self.observePort)
+                rhs = Identifier(self.observePort + "_int")
+                items.append(Assign(lhs, rhs))       
+
+            # The module has both internal and instance-wise control ports
+            if controlPortInstIndex > 0 and moduleToControlWidth[moduleNode[1]] > 0:
+                # Declare wire <controlPortIn_inst>
+                controlPortInstWidth = Width(msb = IntConst(controlPortInstIndex - 1), lsb = IntConst(0))
+                items.insert(0, Decl((Wire(self.controlPortIn + "_inst", width = controlPortInstWidth)),))
+                # Add assignment assign <controlPortIn> = {<controlPortIn>_int, <controlPortIn>_inst}
+                lhs = Identifier(self.controlPortIn)
+                concatWireOne = Identifier(self.controlPortIn + "_int")
+                concatWireTwo = Identifier(self.controlPortIn + "_inst")
+                rhs = Concat([concatWireOne, concatWireTwo])
+                items.append(Assign(lhs, rhs))
+                # Declare wire <controlPortOut_inst>
+                items.insert(0, Decl((Wire(self.controlPortOut + "inst", width = controlPortInstWidth)),))
+                # Add assignment assign {<controlPortOut>_int, <controlPortOut>_inst} = <controlPortOut>
+                concatWireOne = Identifier(self.controlPortOut + "_int")
+                concatWireTwo = Identifier(self.controlPortOut + "_inst")
+                lhs = Concat([concatWireOne, concatWireTwo])
+                rhs = Identifier(self.controlPortOut)
+                items.append(Assign(lhs, rhs))
+            # The module has instance-wise but no internal control ports
+            elif controlPortInstIndex > 0 and moduleToControlWidth[moduleNode[1]] == 0:
+                # Declare wire <controlPortIn_inst>
+                controlPortInstWidth = Width(msb = IntConst(controlPortInstIndex - 1), lsb = IntConst(0))
+                items.insert(0, Decl((Wire(self.controlPortIn + "_inst", width = controlPortInstWidth)),))
+                # Add assignment assign <controlPortIn> = <controlPortIn>_inst
+                lhs = Identifier(self.controlPortIn)
+                rhs = Identifier(self.controlPortIn + "_inst")
+                items.append(Assign(lhs, rhs))
+                # Add assignment assign <controlPortOut> = <controlPortOut>_inst
+                lhs = Identifier(self.controlPortOut + "_inst")
+                rhs = Identifier(self.controlPortOut)
+                items.append(Assign(lhs, rhs))
+            # The module has internal but no instance-wise control ports
+            elif controlPortInstIndex == 0 and moduleToControlWidth[moduleNode[1]] > 0:
+                # Add assignment assign <controlPortIn> = <controlPortIn>_int
+                lhs = Identifier(self.controlPortIn)
+                rhs = Identifier(self.controlPortIn + "_int")
+                items.append(Assign(lhs, rhs))
+                # Add assignment assign <controlPortOut> = <controlPortOut>_int
+                lhs = Identifier(self.controlPortOut + "_int")
+                rhs = Identifier(self.controlPortOut)
+                items.append(Assign(lhs, rhs))
+
+            # Final observe/control port width     
+            observePortWidth = observePortInstIndex + moduleToObserveWidth[moduleNode[1]]
+            controlPortWidth = controlPortInstIndex + moduleToControlWidth[moduleNode[1]]
+            
+            # IO Port declaration for the current module
+            if observePortInstIndex != 0 or moduleToObserveWidth[moduleNode[1]] != 0: 
+                observePortTotalWidth = Width(msb = IntConst(observePortWidth-1), lsb = IntConst(0))
+                observePortOutput = Ioport(Output(self.observePort, width = observePortTotalWidth))
+                ports.append(observePortOutput)
+                self.getAstForModule(moduleNode[1]).portlist.ports = tuple(ports)
+            if  controlPortInstIndex != 0 or moduleToControlWidth[moduleNode[1]] != 0:
+                controlPortTotalWidth = Width(msb = IntConst(controlPortWidth-1), lsb = IntConst(0))
+                controlPortOutput = Ioport(Output(self.controlPortIn, width =controlPortTotalWidth))
+                controlPortInput  = Ioport(Input(self.controlPortOut, width =controlPortTotalWidth))
+                ports.extend([controlPortOutput, controlPortInput])
+                self.getAstForModule(moduleNode[1]).portlist.ports = tuple(ports)
+            
+        else:
+            return
+    
+    def stageTwoFileModifier(self, moduleToObserveWidth, moduleToControlWidth):
+        # Top module node in instance tree
+        topModuleNode = ("TOP", self.topModule)
+        self.insertInterModuleHooks(moduleNode           = topModuleNode,        \
+                                    treeNode             = self.instanceTree,    \
+                                    moduleToControlWidth = moduleToControlWidth, \
+                                    moduleToObserveWidth = moduleToObserveWidth)
+
+
+
+    # This method modifies the AST for inserting observation/control hooks
+    #            __________________________                   __________________________
+    #           |                          |                  |                          |
+    # AST ------|      Stage 1             |------------------|      Stage 2             |----- Modified AST
+    #           | (Intra Module Insertion) |                  | (Inter Module Insertion) |
+    #           |__________________________|                  |__________________________|
+    #
+    # Stage 1: Intra module insertion inserts patch hooks for signal observed/controlled within module
+    # Stage 2: Inter module insertion connects up patch hooks between module hierarchies
+    def astModifier(self):
+        moduleToObserveWidth = {}
+        moduleToControlWidth = {}
+        # STAGE - 1 (Intra module hook insertion)
+        for file in self.fileToModuleToSignalToObserve :
+            logging.info("Stage 1 AST modification: Inserting internal observe/control hooks in file - %s" %(file))
+            moduleToObserveWidthPerFile, moduleToControlWidthPerFile =  self.stageOneFileModifier(file, self.fileToModuleToSignalToObserve[file], 
+                                                                                                        self.fileToModuleToSignalToControl[file])
+            logging.info("Stage 1 AST modification complete")
+            moduleToObserveWidth.update(moduleToObserveWidthPerFile)
+            moduleToControlWidth.update(moduleToControlWidthPerFile)
+
+        # STAGE - 2 (Inter module hook insertion)   
+        logging.info("Stage 2 AST modification: Connecting hooks across multiple modules")
+        self.stageTwoFileModifier(moduleToObserveWidth, \
+                                  moduleToControlWidth)
+        logging.info("Stage 2 AST modification complete")
+
+    def genModifiedVerilogFile(self, file):
+        logging.info("Generating modified verilog files...")
         codegen = ASTCodeGenerator()
         newFilename = os.path.splitext(file)[0] + "_patch.v"
-        logging.info("Inserting patch wiring in file - %s" %(file))
-        self.fileModifier(file, signalToObserve, signalToControl)
         verilogCode = codegen.visit(self.filewiseAst[file])
         with open(newFilename, "w") as f:
             f.write(str(verilogCode))
+        logging.info("File write completed.")
     
     # This method generates new verilog code for each file in the filelist
     def generateVerilog(self):
-        logging.info("Starting Patch Logic Insertion.....")
-        for file in self.fileToSignalToObserve:
-            self.genModifiedVerilogFile(file, self.fileToSignalToObserve[file],   \
-                                              self.fileToSignalToControl[file])
-        logging.info("Patch logic insertion complete.")
+        logging.info("Starting cross-module patch hook insertion.....")
+        self.astModifier()
+        logging.info("Cross module patch hook insertion complete")
+        for file in self.fileToModuleToSignalToObserve:
+            self.genModifiedVerilogFile(file)
 
 
 if __name__ == '__main__':
     filelist = "filelist.f"
     logging.info("Verilog signal parsing started for filelist %s"%(filelist))
-    parser = VerilogParser(filelist)
-    fileToSignalToObserve, fileToSignalToControl = parser.fileToSignalToPragma()
-    filewiseAst = parser.fileWiseAst()
+    TOP_MODULE = "Sample"
+    parser = VerilogParser(filelist, TOP_MODULE)
+    fileToModuleToSignalToObserve, fileToModuleToSignalToControl = parser.fileToModuleToSignalToPragma()
+    filewiseAst = parser.fileToAst
     OBSERVE_PORT_NAME = "observe_port"
     CONTROL_PORT_IN_NAME = "control_port_in"
     CONTROL_PORT_OUT_NAME = "control_port_out"
+    TOP_MODULE = "Sample"
     verilogGenerator = VerilogGenerator(filewiseAst,              \
-                                        fileToSignalToObserve,    \
-                                        fileToSignalToControl,    \
+                                        parser.tree,              \
+                                        TOP_MODULE,               \
+                                        fileToModuleToSignalToObserve,    \
+                                        fileToModuleToSignalToControl,    \
                                         OBSERVE_PORT_NAME,        \
                                         CONTROL_PORT_IN_NAME,     \
                                         CONTROL_PORT_OUT_NAME)
