@@ -1,0 +1,15 @@
+2024-04-09 03:30:41,833 - INFO - Started Automatic, Scalable And Programmable (ASAP) tool for Hardware Patching...
+
+     _    ____    _    ____     ____ ___  __  __ ____ ___ _     _____ ____  
+   / \  / ___|  / \  |  _ \   / ___/ _ \|  \/  |  _ \_ _| |   | ____|  _ \ 
+  / _ \ \___ \ / _ \ | |_) | | |  | | | | |\/| | |_) | || |   |  _| | |_) |
+ / ___ \ ___) / ___ \|  __/  | |__| |_| | |  | |  __/| || |___| |___|  _ < 
+/_/   \_\____/_/   \_\_|      \____\___/|_|  |_|_|  |___|_____|_____|_| \_\
+                                                                           
+
+2024-04-09 03:30:41,834 - INFO - Running lexical analysis on ASAP-SMU patch file - 'patch.asap.smu'
+2024-04-09 03:30:41,834 - INFO - Lexical analysis successyfully completed.
+2024-04-09 03:30:41,834 - INFO - Parsing patch.asap.smu
+2024-04-09 03:30:41,835 - INFO - Parsed patch.asap.smu successfully - AST generated
+2024-04-09 03:30:41,835 - INFO - Generated AST is - 
+ SequenceList([Sequence(s0  [Pattern(TOP.A[1:0] Comparison(==) 2'b00), Pattern(TOP.inst1.inst2.inter[1:0] Comparison(>) 2'b11)]), Sequence(s1  [Pattern(TOP.B[6:0] Comparison(==) 7'b0010001)]), Sequence(s3  [])])

@@ -15,7 +15,7 @@ fileHandler = logging.FileHandler('verilog_parse.log', mode='w')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fileHandler.setFormatter(formatter)
 logging.getLogger().addHandler(fileHandler)
-logging.info("Started Automatic, Scalable And Programmable (ASAP) tool for Hardware Patching...\n\n " + pyfiglet.figlet_format("ASAP  PATCH"))
+logging.info("Started Automatic, Scalable And Programmable (ASAP) tool for Hardware Patching...\n\n " + pyfiglet.figlet_format("ASAP  INSERTION"))
 #--------------------------------------------------------------------------------------------------#
 
 # Exception class for pragma parsing
@@ -143,7 +143,31 @@ class InstantiationTree:
                         treeNode.update({(instance.name, instance.module): \
                                         self.populateTree(self.moduleToAst[instance.module])})
         return treeNode if treeNode else None
-                    
+    
+    def populateSignalList(self, treeNode, moduleToObserveSignal, moduleToControlSignal, observeIndex = 0, controlIndex = 0):
+        if treeNode is not None:
+            observeSignalList = {}
+            controlSignalList = {}
+            for key, value in treeNode.items:
+                observeSignals = moduleToObserveSignal[key[1]]
+                controlSignals = moduleToControlSignal[key[1]]
+                for signal in observeSignals:
+                    observeSignalList.update({signal:[observeSignals[1] - observeSignals[0] + observeIndex, observeIndex]})
+                    observeIndex +=  observeSignals[1] - observeSignals[0] + 1
+                for signal in controlSignals:
+                    controlSignalList.update({signal:[controlSignals[1] - controlSignals[0] + controlIndex, controlIndex]})
+                    controlIndex +=  controlSignals[1] - controlSignals[0] + 1
+                
+                observeChild, controlChild = self.populateSignalList(value,                  \
+                                                                     moduleToObserveSignal,  \
+                                                                     moduleToControlSignal,  \
+                                                                     observeIndex,           \
+                                                                     controlIndex)
+                observeSignalList.update(observeChild)
+                controlSignalList.update(controlChild)
+
+        return {key[0]:observeSignalList}, {key[0]:controlSignalList}
+          
 
 # Class to parse the filelist
 class VerilogParser(LogStructuring):
@@ -303,7 +327,7 @@ class VerilogGenerator(LogStructuring):
                                                                                                                             signal))
                 signalRangeLhs = signalToObserve[signal][0]
                 signalRangeRhs = signalToObserve[signal][1]
-                observePortRangeLhs = observePortIndexLastInt + (signalRangeRhs - signalRangeLhs)
+                observePortRangeLhs = observePortIndexLastInt + (signalRangeLhs - signalRangeRhs)
                 observePortRangeRhs = observePortIndexLastInt
                 Lhs = Partselect(Identifier(self.observePort + "_int"),  \
                                 IntConst(observePortRangeLhs), \
@@ -312,7 +336,7 @@ class VerilogGenerator(LogStructuring):
                                 IntConst(signalRangeLhs), \
                                 IntConst(signalRangeRhs))
                 assignmentList.append(Assign(Lhs, Rhs))
-                observePortIndexLastInt = observePortRangeLhs + 1
+                observePortIndexLastInt += (signalRangeLhs - signalRangeRhs) + 1
             # If the counter part (+/- "_controlled") of observed signal is in SRU sriver list as well,
             # -- we should observe this as the original observed signal would be the patched version
             # -- assign <observePortInt[<range>]> = <couterPart(signal)[OBSERVE_START:OBSERVE_END]> 
@@ -321,7 +345,7 @@ class VerilogGenerator(LogStructuring):
                                                                                                                self.signalCounterPart(signal)))
                 signalRangeLhs = signalToObserve[signal][0]
                 signalRangeRhs = signalToObserve[signal][1]
-                observePortRangeLhs = observePortIndexLastInt + (signalRangeRhs - signalRangeLhs)
+                observePortRangeLhs = observePortIndexLastInt + (signalRangeLhs - signalRangeRhs)
                 observePortRangeRhs = observePortIndexLastInt
                 Lhs = Partselect(Identifier(self.observePort + "_int"),  \
                                 IntConst(observePortRangeLhs), \
@@ -330,7 +354,7 @@ class VerilogGenerator(LogStructuring):
                                 IntConst(signalRangeLhs), \
                                 IntConst(signalRangeRhs))
                 assignmentList.append(Assign(Lhs, Rhs))
-                observePortIndexLastInt = observePortIndexLastInt + 1
+                observePortIndexLastInt += (signalRangeLhs - signalRangeRhs) + 1
             # If the observed signal of the counterPart is not in SRU driver list,
             # it is not controlled and we can safely observe the original signal
             else:
@@ -339,7 +363,7 @@ class VerilogGenerator(LogStructuring):
                                                                                                                             signal))
                 signalRangeLhs = signalToObserve[signal][0]
                 signalRangeRhs = signalToObserve[signal][1]
-                observePortRangeLhs = observePortIndexLastInt + (signalRangeRhs - signalRangeLhs)
+                observePortRangeLhs = observePortIndexLastInt + (signalRangeLhs - signalRangeRhs)
                 observePortRangeRhs = observePortIndexLastInt
                 Lhs = Partselect(Identifier(self.observePort + "_int"),  \
                                 IntConst(observePortRangeLhs), \
@@ -348,7 +372,7 @@ class VerilogGenerator(LogStructuring):
                                 IntConst(signalRangeLhs), \
                                 IntConst(signalRangeRhs))
                 assignmentList.append(Assign(Lhs, Rhs))
-                observePortIndexLastInt = observePortIndexLastInt + 1
+                observePortIndexLastInt += (signalRangeLhs - signalRangeRhs) + 1
         return assignmentList, observePortIndexLastInt - 1
     
     def signalCounterPart(self, signal):
@@ -371,7 +395,7 @@ class VerilogGenerator(LogStructuring):
         for signalNode in sruDriverList:
             signalRangeLhs = signalNode[1]
             signalRangeRhs = signalNode[2]
-            controlPortRangeLhs = controlPortInIndexLastInt + (signalRangeRhs - signalRangeLhs)
+            controlPortRangeLhs = controlPortInIndexLastInt + (signalRangeLhs - signalRangeRhs)
             controlPortRangeRhs = controlPortInIndexLastInt
             Lhs = Partselect(Identifier(self.controlPortIn + "_int"), \
                             IntConst(controlPortRangeLhs),            \
@@ -380,14 +404,14 @@ class VerilogGenerator(LogStructuring):
                             IntConst(signalRangeLhs),                 \
                             IntConst(signalRangeRhs))
             assignmentList.append(Assign(Lhs, Rhs))
-            controlPortInIndexLastInt = controlPortInIndexLastInt + 1
+            controlPortInIndexLastInt +=  (signalRangeLhs - signalRangeRhs) + 1
 
         # Internal output tap assignment - assign <signal'[START:END]> = <controlPortOutInt[range]]>
         # FIXME (Not implemented)          assign <signal'[rest]> = <signal[rest]>
         for signalNode in sruLoadList:
             signalRangeLhs = signalNode[1]
             signalRangeRhs = signalNode[2]
-            controlPortRangeLhs = controlPortOutIndexLastInt + (signalRangeRhs - signalRangeLhs)
+            controlPortRangeLhs = controlPortOutIndexLastInt + (signalRangeLhs - signalRangeRhs)
             controlPortRangeRhs = controlPortOutIndexLastInt
             Lhs = Partselect(Identifier(signalNode[0]),                    \
                             IntConst(signalRangeLhs),                      \
@@ -396,8 +420,9 @@ class VerilogGenerator(LogStructuring):
                             IntConst(controlPortRangeLhs),                 \
                             IntConst(controlPortRangeRhs))
             assignmentList.append(Assign(Lhs, Rhs))
-            controlPortOutIndexLastInt = controlPortOutIndexLastInt + 1
-
+            controlPortOutIndexLastInt += ((signalRangeLhs - signalRangeRhs)) + 1
+        
+        assert (controlPortOutIndexLastInt == controlPortInIndexLastInt), "Control port in/out cannot be of different size"
         return assignmentList, controlPortInIndexLastInt - 1, controlPortOutIndexLastInt - 1
     
     # This method recursively traverses the AST to modify all drivers of a signal
@@ -444,6 +469,7 @@ class VerilogGenerator(LogStructuring):
             # -- Change all loads (RHS) of A to A_controlled 
             if isinstance(port.second, Wire) and isinstance(port.first, Input):
                 newPorts.append(port)
+                print(port.first.name)
                 if port.first.name in signalToControl:
                     logging.info("-- Bits [%s:%s] of Input port '%s' found as '%s' controlled"%(signalToControl[port.first.name][1],  \
                                                                                             signalToControl[port.first.name][2],  \
@@ -647,7 +673,7 @@ class VerilogGenerator(LogStructuring):
 
         assignmentList, controlPortInIndexLastInt, controlPortOutIndexLastInt = self.createInternalControlTaps((sruDriverListIo + sruDriverListDec),
                                                                                                       (sruLoadListIo + sruLoadListDec))
-        # Adding Control port input and output
+        # Adding internal control wire 
         if controlPortInIndexLastInt >= 0:
             controlPortInWidthInt  =  Width(msb=IntConst(controlPortInIndexLastInt),  lsb=IntConst(0))
             controlPortOutWidthInt =  Width(msb=IntConst(controlPortOutIndexLastInt), lsb=IntConst(0))
@@ -738,8 +764,9 @@ class VerilogGenerator(LogStructuring):
                     if childModule[1] not in self.moduleToControlPortWidth and \
                        childModule[1] not in self.moduleToObservePortWidth:
                         self.insertInterModuleHooks(childModule, {childModule: treeNode[moduleNode][childModule]},  \
-                                                                moduleToObserveWidth,                              \
-                                                                moduleToControlWidth)
+                                                                  moduleToObserveWidth,                             \
+                                                                  moduleToControlWidth)
+
                     for item in items:
                         if isinstance(item, InstanceList):
                             instances = item.instances
@@ -856,6 +883,8 @@ class VerilogGenerator(LogStructuring):
                 lhs = Identifier(self.controlPortOut + "_int")
                 rhs = Identifier(self.controlPortOut)
                 items.append(Assign(lhs, rhs))
+            else:
+                logging.info("-- Module '%s' has neither internal nor instance-wise control hooks" %(moduleNode[1]))
 
             # Final observe/control port width     
             self.moduleToObservePortWidth[moduleNode[1]] = observePortInstIndex + moduleToObserveWidth[moduleNode[1]]
@@ -886,6 +915,39 @@ class VerilogGenerator(LogStructuring):
                                     treeNode             = self.instanceTree,    \
                                     moduleToControlWidth = moduleToControlWidth, \
                                     moduleToObserveWidth = moduleToObserveWidth)
+        
+    # Method to generate the observe/control signal list  
+    # This list is used by ASAP compiler to generate bitstream  
+    def getSignalList(self, treeNode, currentModule, moduleToObserveSignal, moduleToControlSignal, observeIndex = 0, controlIndex = 0):
+        if treeNode is not None:
+            observeSignalList = {}
+            controlSignalList = {}
+            observeSignals = moduleToObserveSignal[currentModule[1]]
+            controlSignals = moduleToControlSignal[currentModule[1]]
+
+            # First: Update the list with all the signals in the current module being processed
+            for signal in observeSignals:
+                observeSignalList.update({signal:[observeSignals[signal][0] - observeSignals[signal][1] + observeIndex, observeIndex]})
+                observeIndex +=  observeSignals[signal][0] - observeSignals[signal][1] + 1
+            for signal in controlSignals:
+                controlSignalList.update({signal:[controlSignals[signal][1] - controlSignals[signal][2] + controlIndex, controlIndex]})
+                controlIndex +=  controlSignals[signal][1] - controlSignals[signal][2] + 1
+            
+            # Second: Update the list with signals of internal instances sequentially (use recursion)
+            if treeNode[currentModule] is not None:
+                for child in treeNode[currentModule]:
+                    observeChild, controlChild,                                              \
+                    observeIndex, controlIndex = self.getSignalList(treeNode[currentModule], \
+                                                                    child,                   \
+                                                                    moduleToObserveSignal,   \
+                                                                    moduleToControlSignal,   \
+                                                                    observeIndex,            \
+                                                                    controlIndex)
+                    observeSignalList.update(observeChild)
+                    controlSignalList.update(controlChild)
+            return {currentModule[0]:observeSignalList}, {currentModule[0]:controlSignalList}, observeIndex, controlIndex
+        else:
+            return None, None
 
 
 
@@ -901,6 +963,8 @@ class VerilogGenerator(LogStructuring):
     def astModifier(self):
         moduleToObserveWidth = {}
         moduleToControlWidth = {}
+        consolidatedModuletoSignalToObserve = {}
+        consolidatedModuletoSignalToControl = {}
         # STAGE - 1 (Intra module hook insertion)
         for file in self.fileToModuleToSignalToObserve :
             logging.info("Stage 1 AST modification: Inserting internal observe/control hooks in file - %s" %(file))
@@ -909,12 +973,23 @@ class VerilogGenerator(LogStructuring):
             logging.info("Stage 1 AST modification complete")
             moduleToObserveWidth.update(moduleToObserveWidthPerFile)
             moduleToControlWidth.update(moduleToControlWidthPerFile)
+            consolidatedModuletoSignalToObserve.update(self.fileToModuleToSignalToObserve[file])
+            consolidatedModuletoSignalToControl.update(self.fileToModuleToSignalToControl[file])
 
         # STAGE - 2 (Inter module hook insertion)   
         logging.info("Stage 2 AST modification: Connecting cross-module observe/control hooks")
         self.stageTwoFileModifier(moduleToObserveWidth, \
                                   moduleToControlWidth)
         logging.info("Stage 2 AST modification complete")
+
+        # Generate signalMap
+        observeSignalList, controlSignalList, observeWidth, controlWidth = self.getSignalList(self.instanceTree,                    \
+                                                                                              ("TOP", self.topModule),              \
+                                                                                              consolidatedModuletoSignalToObserve,  \
+                                                                                              consolidatedModuletoSignalToControl)
+        logging.info("Net width of control signal = %d"%(controlWidth))
+        logging.info("Net width of observe signal = %d"%(observeWidth))
+        return observeSignalList, controlSignalList
 
     def genModifiedVerilogFile(self, file):
         logging.info("Generating modified verilog files...")
@@ -928,10 +1003,11 @@ class VerilogGenerator(LogStructuring):
     # This method generates new verilog code for each file in the filelist
     def generateVerilog(self):
         logging.info("Starting cross-module patch hook insertion.....")
-        self.astModifier()
+        observeSignalList, controlSignalList = self.astModifier()
         logging.info("Cross module patch hook insertion complete")
         for file in self.fileToModuleToSignalToObserve:
             self.genModifiedVerilogFile(file)
+        return observeSignalList, controlSignalList 
 
 
 if __name__ == '__main__':
@@ -953,4 +1029,6 @@ if __name__ == '__main__':
                                         OBSERVE_PORT_NAME,        \
                                         CONTROL_PORT_IN_NAME,     \
                                         CONTROL_PORT_OUT_NAME)
-    verilogGenerator.generateVerilog()
+    observeSignalList, controlSignalList = verilogGenerator.generateVerilog()
+    print(observeSignalList)
+    print(controlSignalList)
